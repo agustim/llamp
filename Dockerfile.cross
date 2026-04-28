@@ -1,0 +1,50 @@
+# Cross-compilation Dockerfile for Llamp
+# Builds for x86_64 and aarch64 Linux targets using musl
+
+FROM rust:1.85-bookworm as builder
+
+# Install cross-compilation tools
+RUN apt-get update && apt-get install -y \
+    qemu-user-static \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    musl-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install musl targets
+RUN rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+
+# Create build user to avoid root
+RUN useradd -m -u 1000 builder
+USER builder
+WORKDIR /home/builder
+
+# Copy source
+COPY --chown=builder:builder . .
+
+# Build for x86_64 musl (static linking, no OpenSSL dependency)
+RUN cargo build --release --target=x86_64-unknown-linux-musl
+
+# Build for aarch64 musl (static linking, no OpenSSL dependency)
+RUN cargo build --release --target=aarch64-unknown-linux-musl
+
+# Create release directory
+RUN mkdir -p /home/builder/release
+
+# Copy binaries
+RUN cp target/x86_64-unknown-linux-musl/release/llamp /home/builder/release/llamp-x86_64-musl
+RUN cp target/aarch64-unknown-linux-musl/release/llamp /home/builder/release/llamp-aarch64-musl
+
+# Final minimal image for distribution
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /app
+
+COPY --from=builder /home/builder/release/llamp-x86_64-musl /app/llamp-x86_64
+COPY --from=builder /home/builder/release/llamp-aarch64-musl /app/llamp-aarch64
+
+RUN chmod +x /app/llamp-*
+
+CMD ["/app/llamp-x86_64", "--help"]

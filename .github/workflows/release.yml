@@ -22,34 +22,39 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          targets: x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
+          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu
 
-      - name: Install cross
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
+      - name: Install OpenSSL for x86_64
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
 
-      - name: Build Linux x86_64 (musl)
-        run: cross build --release --target=x86_64-unknown-linux-musl
+      - name: Build Linux x86_64
+        run: cargo build --release --target=x86_64-unknown-linux-gnu
 
-      - name: Build Linux aarch64 (musl)
-        run: cross build --release --target=aarch64-unknown-linux-musl
+      - name: Build Linux aarch64
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev:arm64 pkg-config:arm64
+          cargo build --release --target=aarch64-unknown-linux-gnu
+        env:
+          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig
+          PKG_CONFIG_ALLOW_CROSS: 1
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: llamp-binaries
           path: |
-            target/x86_64-unknown-linux-musl/release/llamp
-            target/aarch64-unknown-linux-musl/release/llamp
+            target/x86_64-unknown-linux-gnu/release/llamp
+            target/aarch64-unknown-linux-gnu/release/llamp
           retention-days: 1
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            target/x86_64-unknown-linux-musl/release/llamp
-            target/aarch64-unknown-linux-musl/release/llamp
+            target/x86_64-unknown-linux-gnu/release/llamp
+            target/aarch64-unknown-linux-gnu/release/llamp
           generate_release_notes: true
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}

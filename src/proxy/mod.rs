@@ -1,12 +1,26 @@
-use crate::auth;
-use crate::db;
 use axum::{
+    body::Body,
+    extract::{Extension, Json},
     http::StatusCode,
     middleware,
+    response::Response,
     routing::{get, post},
-    Json, Router,
+    Router,
 };
 use serde_json::json;
+
+// Import the models
+use crate::models::{User, ChatCompletionRequest, NewUsageLog};
+
+// Import the database module
+use crate::db;
+
+// Import the auth module
+use crate::auth;
+
+// Import the providers
+use crate::providers::openai::OpenAIProvider;
+use crate::providers::LLMProvider;
 
 pub async fn create_app() -> anyhow::Result<Router> {
     let app = Router::new()
@@ -35,14 +49,74 @@ pub async fn create_app() -> anyhow::Result<Router> {
     Ok(app)
 }
 
-async fn chat_completions() -> String {
-    // This is a placeholder implementation that shows how we would use the database functions
-    // In a real implementation, we would:
-    // 1. Parse the request to get the model alias
-    // 2. Use get_backend_by_alias to find the backend
-    // 3. Use get_user_by_proxy_key to authenticate the user
-    // 4. Create a usage log with create_usage_log after processing
-    "Chat completions endpoint - placeholder implementation".to_string()
+async fn chat_completions(
+    Extension(user): Extension<User>,
+    Json(request): Json<ChatCompletionRequest>,
+) -> Result<Response, (StatusCode, String)> {
+    // Create a database pool
+    let pool = db::init("sqlite://./llamp.db").await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to connect to database: {}", e)))?;
+
+    // Get the backend for the requested model
+    let backend = db::get_backend_by_alias(&pool, &request.model).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to fetch backend: {}", e)))?
+        .ok_or((StatusCode::NOT_FOUND, "Model not found".to_string()))?;
+
+    // Create the OpenAI provider
+    let provider = OpenAIProvider::new();
+
+    // Prepare the request to the backend
+    let backend_request = provider.prepare_request(&request, &backend).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to prepare request: {}", e)))?;
+
+    // Forward the request to the backend
+    let client = reqwest::Client::new();
+    let start_time = std::time::Instant::now();
+
+    let backend_response = client.execute(backend_request).await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Failed to connect to backend: {}", e)))?;
+
+    let elapsed = start_time.elapsed();
+
+    // Get the response body
+    let response_body = backend_response.text().await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Failed to read backend response: {}", e)))?;
+
+    // Parse the response
+    let response_json: serde_json::Value = serde_json::from_str(&response_body)
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Failed to parse backend response: {}", e)))?;
+
+    // Extract usage if available
+    let usage = provider.parse_usage(&response_json);
+    let prompt_tokens = usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0);
+    let completion_tokens = usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0);
+    let total_tokens = usage.as_ref().map(|u| u.total_tokens).unwrap_or(0);
+
+    // Create a usage log entry
+    let usage_log = NewUsageLog {
+        user_id: Some(user.id),
+        model_alias: Some(request.model.clone()),
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+        latency_ms: Some(elapsed.as_millis() as i64),
+        cost: None,
+        status: "success".to_string(),
+        error_message: None,
+    };
+
+    // Create the usage log in the database
+    let _log = db::create_usage_log(&pool, usage_log).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create usage log: {}", e)))?;
+
+    // Build the response
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Body::from(response_body))
+        .unwrap();
+
+    Ok(response)
 }
 
 async fn list_models() -> Result<Json<serde_json::Value>, (StatusCode, String)> {

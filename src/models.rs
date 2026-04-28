@@ -33,7 +33,7 @@ pub struct NewBackend {
     pub active: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct User {
     pub id: i64,
     pub username: String,
