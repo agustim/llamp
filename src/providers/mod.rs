@@ -5,21 +5,23 @@ use serde_json::Value;
 use crate::models::{ChatCompletionRequest};
 use async_trait::async_trait;
 
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum ProviderError {
     #[error("HTTP error: {0}")]
     HttpError(#[from] reqwest::Error),
-    
+
     #[error("JSON error: {0}")]
     JsonError(#[from] serde_json::Error),
-    
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-    
+
     #[error("Other error: {0}")]
     Other(#[from] anyhow::Error),
 }
 
+#[allow(dead_code)]
 pub type Result<T> = std::result::Result<T, ProviderError>;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,6 +49,7 @@ pub struct Delta {
     pub content: Option<String>,
 }
 
+#[allow(dead_code)]
 #[async_trait]
 pub trait LLMProvider: Send + Sync {
     /// Transform an OpenAI request to the provider's format

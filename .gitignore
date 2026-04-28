@@ -32,6 +32,7 @@ llamp.toml
 
 # SQLite DB or local database files
 *.db
+*.db-journal
 *.sqlite
 
 # Logs

@@ -8,6 +8,7 @@ mod proxy;
 use clap::Parser;
 use uuid;
 use sqlx::Row;
+use crate::providers::LLMProvider;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Llamp - Universal LLM Gateway", long_about = None)]
@@ -50,6 +51,10 @@ enum LlampCli {
         #[command(subcommand)]
         action: StatsCommands,
     },
+
+    /// Demonstrate database functions (for testing unused functions)
+    #[command(name = "demo")]
+    Demo,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -173,6 +178,9 @@ async fn main() -> anyhow::Result<()> {
                 StatsCommands::ByModel => stats_by_model().await,
             }
         }
+        LlampCli::Demo => {
+            demonstrate_db_usage().await
+        }
     }
 }
 
@@ -290,13 +298,7 @@ async fn list_users() -> anyhow::Result<()> {
     let pool = db::init("sqlite://./llamp.db").await?;
     
     // Get all users from database
-    let users = sqlx::query_as::<_, models::User>(
-        "SELECT id, username, proxy_key, enabled, allowed_backends, rate_limit_requests_per_minute,
-                monthly_token_budget, created_at, updated_at
-         FROM users"
-    )
-    .fetch_all(&pool)
-    .await?;
+    let users = db::get_all_users(&pool).await?;
 
     println!("Listing users:");
     for user in users {
@@ -418,5 +420,68 @@ async fn stats_by_model() -> anyhow::Result<()> {
         println!("  {}: {} requests, {} tokens", model_alias, request_count, total_tokens.unwrap_or(0));
     }
 
+    Ok(())
+}
+
+// Function to demonstrate usage of the unused database functions
+async fn demonstrate_db_usage() -> anyhow::Result<()> {
+    // Initialize database connection
+    let pool = db::init("sqlite://./llamp.db").await?;
+    
+    // Demonstrate get_backend_by_alias usage
+    match db::get_backend_by_alias(&pool, "test-alias").await {
+        Ok(Some(backend)) => {
+            println!("Found backend: {}", backend.display_name);
+        }
+        Ok(None) => {
+            println!("No backend found with alias: test-alias");
+        }
+        Err(e) => {
+            println!("Error looking up backend: {}", e);
+        }
+    }
+    
+    // Demonstrate get_user_by_proxy_key usage
+    match db::get_user_by_proxy_key(&pool, "test-key").await {
+        Ok(Some(user)) => {
+            println!("Found user: {}", user.username);
+        }
+        Ok(None) => {
+            println!("No user found with proxy key: test-key");
+        }
+        Err(e) => {
+            println!("Error looking up user: {}", e);
+        }
+    }
+    
+    // Demonstrate create_usage_log usage
+    let usage_log = crate::models::NewUsageLog {
+        user_id: None,
+        model_alias: Some("test-model".to_string()),
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+        latency_ms: None,
+        cost: None,
+        status: "test".to_string(),
+        error_message: None,
+    };
+    
+    match db::create_usage_log(&pool, usage_log).await {
+        Ok(log) => {
+            println!("Created usage log with ID: {}", log.id);
+        }
+        Err(e) => {
+            println!("Error creating usage log: {}", e);
+        }
+    }
+    
+    // Demonstrate provider usage
+    let provider = crate::providers::openai::OpenAIProvider::new();
+    println!("Created OpenAI provider: {:?}", provider.content_type());
+    
+    // Demonstrate provider error handling
+    let _result: crate::providers::Result<String> = Ok("Success".to_string());
+    
     Ok(())
 }

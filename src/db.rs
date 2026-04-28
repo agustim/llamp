@@ -1,9 +1,36 @@
 use sqlx::sqlite::SqlitePool;
 use crate::models::{Backend, NewBackend, User, NewUser, UsageLog, NewUsageLog};
+use std::fs;
 
 pub async fn init(database_url: &str) -> anyhow::Result<SqlitePool> {
+    // Create the database file if it doesn't exist (for file-based SQLite)
+    let is_new_database = if database_url.starts_with("sqlite://") {
+        let path = database_url.replace("sqlite://", "");
+        let path_exists = std::path::Path::new(&path).exists();
+        if !path_exists {
+            // Create the directory if it doesn't exist
+            if let Some(parent) = std::path::Path::new(&path).parent() {
+                if !parent.exists() {
+                    fs::create_dir_all(parent)?;
+                }
+            }
+            // Create an empty file
+            fs::File::create(&path)?;
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+    
     let pool = sqlx::SqlitePool::connect(database_url).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
+    
+    if is_new_database {
+        tracing::info!("New database created at: {}", database_url.replace("sqlite://", ""));
+    }
+    
     Ok(pool)
 }
 
@@ -88,6 +115,18 @@ pub async fn create_user(pool: &SqlitePool, user: NewUser) -> anyhow::Result<Use
     .bind(user.rate_limit_requests_per_minute)
     .bind(user.monthly_token_budget)
     .fetch_one(pool)
+    .await?;
+
+    Ok(result)
+}
+
+pub async fn get_all_users(pool: &SqlitePool) -> anyhow::Result<Vec<User>> {
+    let result = sqlx::query_as::<_, User>(
+        "SELECT id, username, proxy_key, enabled, allowed_backends, rate_limit_requests_per_minute,
+                monthly_token_budget, created_at, updated_at
+         FROM users"
+    )
+    .fetch_all(pool)
     .await?;
 
     Ok(result)
