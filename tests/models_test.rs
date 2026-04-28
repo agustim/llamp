@@ -155,4 +155,26 @@ mod tests {
 
         assert_eq!(usage.prompt_tokens + usage.completion_tokens, usage.total_tokens);
     }
+
+    #[test]
+    fn test_chat_response_usage_structs_exist() {
+        // This test ensures the structs exist and can be instantiated
+        let _response = ChatCompletionResponse {
+            id: "test-id".to_string(),
+            object: "chat.completion".to_string(),
+            created: 1234567890,
+            model: "gpt-4".to_string(),
+            choices: vec![],
+            usage: None,
+        };
+
+        let _choice = Choice {
+            index: 0,
+            message: Message {
+                role: "assistant".to_string(),
+                content: "test".to_string(),
+            },
+            finish_reason: None,
+        };
+    }
 }

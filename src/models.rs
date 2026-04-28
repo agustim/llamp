@@ -104,7 +104,6 @@ pub struct Message {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct ChatCompletionResponse {
     pub id: String,
     pub object: String,
@@ -115,7 +114,6 @@ pub struct ChatCompletionResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct Choice {
     pub index: i32,
     pub message: Message,
