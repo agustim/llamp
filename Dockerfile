@@ -19,14 +19,14 @@ COPY --chown=builder:builder Cargo.lock .
 COPY --chown=builder:builder src ./src
 COPY --chown=builder:builder migrations ./migrations
 
-# Build for current architecture
-RUN cargo build --release --target=x86_64-unknown-linux-gnu
+# Build for current architecture (use native target)
+RUN cargo build --release
 
 # Create release directory
 RUN mkdir -p /home/builder/release
 
 # Copy binary
-RUN cp target/x86_64-unknown-linux-gnu/release/llamp /home/builder/release/llamp
+RUN cp target/release/llamp /home/builder/release/llamp
 
 # Final minimal image for distribution
 FROM debian:bookworm-slim
