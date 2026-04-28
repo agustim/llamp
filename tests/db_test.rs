@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use sqlx::sqlite::SqlitePool;
     use llamp::db;
-    use llamp::models::{NewBackend, NewUser, NewUsageLog};
+    use llamp::models::{NewBackend, NewUsageLog, NewUser};
+    use sqlx::sqlite::SqlitePool;
 
     async fn setup_test_db() -> anyhow::Result<SqlitePool> {
         // Use an in-memory database for testing

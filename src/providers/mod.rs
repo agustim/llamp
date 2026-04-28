@@ -1,9 +1,9 @@
 pub mod openai;
 
+use crate::models::ChatCompletionRequest;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::models::{ChatCompletionRequest};
-use async_trait::async_trait;
 
 #[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
@@ -53,7 +53,11 @@ pub struct Delta {
 #[async_trait]
 pub trait LLMProvider: Send + Sync {
     /// Transform an OpenAI request to the provider's format
-    async fn prepare_request(&self, req: &ChatCompletionRequest, backend: &crate::models::Backend) -> Result<reqwest::Request>;
+    async fn prepare_request(
+        &self,
+        req: &ChatCompletionRequest,
+        backend: &crate::models::Backend,
+    ) -> Result<reqwest::Request>;
 
     /// Parse a streaming chunk from the provider and return it in OpenAI format
     fn parse_streaming_chunk(&self, raw: &[u8]) -> Result<Option<OpenAIStreamChunk>>;

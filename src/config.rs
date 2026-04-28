@@ -38,7 +38,10 @@ impl Config {
     pub fn from_args(cli: &Cli) -> anyhow::Result<Self> {
         let host = cli.host.clone();
         let port = cli.port;
-        let database_url = cli.database.clone().unwrap_or_else(|| "sqlite://./llamp.db".to_string());
+        let database_url = cli
+            .database
+            .clone()
+            .unwrap_or_else(|| "sqlite://./llamp.db".to_string());
         let log_level = "info".to_string();
         let admin_key = cli.admin_key.clone();
 
@@ -50,16 +53,16 @@ impl Config {
             log_level,
         })
     }
-    
+
     // Add methods to actually use the config values
     pub fn get_address(&self) -> String {
         format!("{}:{}", self.host, self.port)
     }
-    
+
     pub fn get_log_level(&self) -> &str {
         &self.log_level
     }
-    
+
     pub fn get_admin_key(&self) -> Option<&String> {
         self.admin_key.as_ref()
     }

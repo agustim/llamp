@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use llamp::models::{NewBackend, NewUser, NewUsageLog, ChatCompletionRequest, Message, ChatCompletionResponse, Choice, Usage};
+    use llamp::models::{
+        ChatCompletionRequest, ChatCompletionResponse, Choice, Message, NewBackend, NewUsageLog,
+        NewUser, Usage,
+    };
 
     #[test]
     fn test_new_backend_creation() {
@@ -102,12 +105,10 @@ mod tests {
     fn test_chat_completion_request() {
         let request = ChatCompletionRequest {
             model: "gpt-4".to_string(),
-            messages: vec![
-                Message {
-                    role: "user".to_string(),
-                    content: "Hello!".to_string(),
-                },
-            ],
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: "Hello!".to_string(),
+            }],
             stream: Some(true),
             temperature: Some(0.7),
             max_tokens: Some(1000),
@@ -153,7 +154,10 @@ mod tests {
             total_tokens: 1500,
         };
 
-        assert_eq!(usage.prompt_tokens + usage.completion_tokens, usage.total_tokens);
+        assert_eq!(
+            usage.prompt_tokens + usage.completion_tokens,
+            usage.total_tokens
+        );
     }
 
     #[test]

@@ -1,10 +1,6 @@
 // Authentication middleware for the Axum application
-use axum::{
-    http::Request,
-    middleware::Next,
-    response::Response,
-};
 use axum::http::StatusCode;
+use axum::{http::Request, middleware::Next, response::Response};
 
 pub async fn auth_middleware(
     request: Request<axum::body::Body>,

@@ -1,22 +1,22 @@
+mod auth;
 mod config;
 mod db;
 mod models;
 mod providers;
-mod auth;
 mod proxy;
 mod tunnel;
 
-use clap::Parser;
-use sqlx::Row;
 use crate::providers::LLMProvider;
 use crate::tunnel::CloudflareTunnel;
+use clap::Parser;
+use sqlx::Row;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 // Global tunnel process - wrapped in Mutex for thread safety
 // Using lazy_static for thread-safe global state
 lazy_static::lazy_static! {
-    static ref TUNNEL_PROCESS: Arc<Mutex<Option<Arc<Mutex<CloudflareTunnel>>>>> = 
+    static ref TUNNEL_PROCESS: Arc<Mutex<Option<Arc<Mutex<CloudflareTunnel>>>>> =
         Arc::new(Mutex::new(None));
 }
 
@@ -40,21 +40,21 @@ enum LlampCli {
         #[arg(long, default_value = "sqlite://./llamp.db")]
         database_url: String,
     },
-    
+
     /// Manage backends
     #[command(name = "backend")]
     Backend {
         #[command(subcommand)]
         action: BackendCommands,
     },
-    
+
     /// Manage users
     #[command(name = "user")]
     User {
         #[command(subcommand)]
         action: UserCommands,
     },
-    
+
     /// Show statistics
     #[command(name = "stats")]
     Stats {
@@ -178,57 +178,69 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     match cli {
-        LlampCli::Serve { port, host, database_url, admin_key } => {
+        LlampCli::Serve {
+            port,
+            host,
+            database_url,
+            admin_key,
+        } => {
             // Run the server if no subcommand or run as server
             run_server(port, host, database_url, admin_key).await
         }
-        LlampCli::Backend { action } => {
-            match action {
-                BackendCommands::List => list_backends().await,
-                BackendCommands::Create { provider_type, display_name, model_alias, model_name, endpoint_url, api_key } => {
-                    create_backend(provider_type, display_name, model_alias, model_name, endpoint_url, api_key).await
-                },
-                BackendCommands::Update { id } => update_backend(id).await,
-                BackendCommands::Delete { id } => delete_backend(id).await,
-                BackendCommands::Test { id } => test_backend(id).await,
+        LlampCli::Backend { action } => match action {
+            BackendCommands::List => list_backends().await,
+            BackendCommands::Create {
+                provider_type,
+                display_name,
+                model_alias,
+                model_name,
+                endpoint_url,
+                api_key,
+            } => {
+                create_backend(
+                    provider_type,
+                    display_name,
+                    model_alias,
+                    model_name,
+                    endpoint_url,
+                    api_key,
+                )
+                .await
             }
-        }
-        LlampCli::User { action } => {
-            match action {
-                UserCommands::List => list_users().await,
-                UserCommands::Create { username, rate_limit } => create_user(username, rate_limit).await,
-                UserCommands::Update { id } => update_user(id).await,
-                UserCommands::Delete { id } => delete_user(id).await,
-                UserCommands::RegenerateKey { id } => regenerate_user_key(id).await,
-            }
-        }
-        LlampCli::Stats { action } => {
-            match action {
-                StatsCommands::Overview => stats_overview().await,
-                StatsCommands::ByUser => stats_by_user().await,
-                StatsCommands::ByModel => stats_by_model().await,
-            }
-        }
-        LlampCli::Demo => {
-            demonstrate_db_usage().await
-        }
-        LlampCli::Tunnel { action } => {
-            match action {
-                TunnelCommands::Start { hostname } => {
-                    start_tunnel(hostname).await
-                }
-                TunnelCommands::Status => {
-                    tunnel_status().await
-                }
-                TunnelCommands::Stop => {
-                    stop_tunnel().await
-                }
-            }
-        }
+            BackendCommands::Update { id } => update_backend(id).await,
+            BackendCommands::Delete { id } => delete_backend(id).await,
+            BackendCommands::Test { id } => test_backend(id).await,
+        },
+        LlampCli::User { action } => match action {
+            UserCommands::List => list_users().await,
+            UserCommands::Create {
+                username,
+                rate_limit,
+            } => create_user(username, rate_limit).await,
+            UserCommands::Update { id } => update_user(id).await,
+            UserCommands::Delete { id } => delete_user(id).await,
+            UserCommands::RegenerateKey { id } => regenerate_user_key(id).await,
+        },
+        LlampCli::Stats { action } => match action {
+            StatsCommands::Overview => stats_overview().await,
+            StatsCommands::ByUser => stats_by_user().await,
+            StatsCommands::ByModel => stats_by_model().await,
+        },
+        LlampCli::Demo => demonstrate_db_usage().await,
+        LlampCli::Tunnel { action } => match action {
+            TunnelCommands::Start { hostname } => start_tunnel(hostname).await,
+            TunnelCommands::Status => tunnel_status().await,
+            TunnelCommands::Stop => stop_tunnel().await,
+        },
     }
 }
 
-async fn run_server(port: u16, host: String, database_url: String, admin_key: Option<String>) -> anyhow::Result<()> {
+async fn run_server(
+    port: u16,
+    host: String,
+    database_url: String,
+    admin_key: Option<String>,
+) -> anyhow::Result<()> {
     // Create CLI struct with provided values
     let cli = config::Cli {
         admin_key,
@@ -253,17 +265,14 @@ async fn run_server(port: u16, host: String, database_url: String, admin_key: Op
     let app = proxy::create_app().await?;
 
     // Run the server
-    let addr = std::net::SocketAddr::new(
-        host.parse().unwrap(),
-        config.port,
-    );
+    let addr = std::net::SocketAddr::new(host.parse().unwrap(), config.port);
     tracing::info!("Llamp server listening on {}", config.get_address());
-    
+
     // Use the admin key if provided
     if let Some(_admin_key) = config.get_admin_key() {
         tracing::info!("Admin key is set for this server");
     }
-    
+
     // Use the log level
     tracing::info!("Log level is set to: {}", config.get_log_level());
 
@@ -283,7 +292,10 @@ async fn list_backends() -> anyhow::Result<()> {
 
     println!("Listing backends:");
     for backend in backends {
-        println!("  {} - {} ({})", backend.id, backend.display_name, backend.model_alias);
+        println!(
+            "  {} - {} ({})",
+            backend.id, backend.display_name, backend.model_alias
+        );
     }
 
     Ok(())
@@ -343,7 +355,7 @@ async fn test_backend(id: i64) -> anyhow::Result<()> {
 async fn list_users() -> anyhow::Result<()> {
     // Initialize database connection with default URL
     let pool = db::init("sqlite://./llamp.db").await?;
-    
+
     // Get all users from database
     let users = db::get_all_users(&pool).await?;
 
@@ -361,7 +373,7 @@ async fn create_user(username: String, rate_limit: i32) -> anyhow::Result<()> {
 
     // Generate a proxy key
     let proxy_key = format!("llamp-{}", uuid::Uuid::new_v4());
-    
+
     // Create new user
     let new_user = models::NewUser {
         username: username.clone(),
@@ -373,7 +385,10 @@ async fn create_user(username: String, rate_limit: i32) -> anyhow::Result<()> {
     };
 
     let user = db::create_user(&pool, new_user).await?;
-    println!("Created user: {} with key: {}", user.username, user.proxy_key);
+    println!(
+        "Created user: {} with key: {}",
+        user.username, user.proxy_key
+    );
 
     Ok(())
 }
@@ -400,16 +415,16 @@ async fn regenerate_user_key(id: i64) -> anyhow::Result<()> {
 async fn stats_overview() -> anyhow::Result<()> {
     // Initialize database connection with default URL
     let pool = db::init("sqlite://./llamp.db").await?;
-    
+
     // Get statistics from database
     let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
         .fetch_one(&pool)
         .await?;
-        
+
     let backend_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM backends")
         .fetch_one(&pool)
         .await?;
-        
+
     let usage_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM usage_logs")
         .fetch_one(&pool)
         .await?;
@@ -425,22 +440,29 @@ async fn stats_overview() -> anyhow::Result<()> {
 async fn stats_by_user() -> anyhow::Result<()> {
     // Initialize database connection with default URL
     let pool = db::init("sqlite://./llamp.db").await?;
-    
+
     // Get user statistics from database
-    let user_stats = sqlx::query("SELECT u.username, COUNT(ul.id) as usage_count, SUM(ul.total_tokens) as total_tokens
+    let user_stats = sqlx::query(
+        "SELECT u.username, COUNT(ul.id) as usage_count, SUM(ul.total_tokens) as total_tokens
                                   FROM users u
                                   LEFT JOIN usage_logs ul ON u.id = ul.user_id
                                   GROUP BY u.id, u.username
-                                  ORDER BY usage_count DESC")
-        .fetch_all(&pool)
-        .await?;
+                                  ORDER BY usage_count DESC",
+    )
+    .fetch_all(&pool)
+    .await?;
 
     println!("Statistics by User:");
     for row in user_stats {
         let username: String = row.get(0);
         let usage_count: i64 = row.get(1);
         let total_tokens: Option<i64> = row.get(2);
-        println!("  {}: {} requests, {} tokens", username, usage_count, total_tokens.unwrap_or(0));
+        println!(
+            "  {}: {} requests, {} tokens",
+            username,
+            usage_count,
+            total_tokens.unwrap_or(0)
+        );
     }
 
     Ok(())
@@ -449,22 +471,29 @@ async fn stats_by_user() -> anyhow::Result<()> {
 async fn stats_by_model() -> anyhow::Result<()> {
     // Initialize database connection with default URL
     let pool = db::init("sqlite://./llamp.db").await?;
-    
+
     // Get model statistics from database
-    let model_stats = sqlx::query("SELECT model_alias, COUNT(*) as request_count, SUM(total_tokens) as total_tokens
+    let model_stats = sqlx::query(
+        "SELECT model_alias, COUNT(*) as request_count, SUM(total_tokens) as total_tokens
                                    FROM usage_logs
                                    WHERE model_alias IS NOT NULL
                                    GROUP BY model_alias
-                                   ORDER BY request_count DESC")
-        .fetch_all(&pool)
-        .await?;
+                                   ORDER BY request_count DESC",
+    )
+    .fetch_all(&pool)
+    .await?;
 
     println!("Statistics by Model:");
     for row in model_stats {
         let model_alias: String = row.get(0);
         let request_count: i64 = row.get(1);
         let total_tokens: Option<i64> = row.get(2);
-        println!("  {}: {} requests, {} tokens", model_alias, request_count, total_tokens.unwrap_or(0));
+        println!(
+            "  {}: {} requests, {} tokens",
+            model_alias,
+            request_count,
+            total_tokens.unwrap_or(0)
+        );
     }
 
     Ok(())
@@ -474,7 +503,7 @@ async fn stats_by_model() -> anyhow::Result<()> {
 async fn demonstrate_db_usage() -> anyhow::Result<()> {
     // Initialize database connection
     let pool = db::init("sqlite://./llamp.db").await?;
-    
+
     // Demonstrate get_backend_by_alias usage
     match db::get_backend_by_alias(&pool, "test-alias").await {
         Ok(Some(backend)) => {
@@ -487,7 +516,7 @@ async fn demonstrate_db_usage() -> anyhow::Result<()> {
             println!("Error looking up backend: {}", e);
         }
     }
-    
+
     // Demonstrate get_user_by_proxy_key usage
     match db::get_user_by_proxy_key(&pool, "test-key").await {
         Ok(Some(user)) => {
@@ -500,7 +529,7 @@ async fn demonstrate_db_usage() -> anyhow::Result<()> {
             println!("Error looking up user: {}", e);
         }
     }
-    
+
     // Demonstrate create_usage_log usage
     let usage_log = crate::models::NewUsageLog {
         user_id: None,
@@ -513,7 +542,7 @@ async fn demonstrate_db_usage() -> anyhow::Result<()> {
         status: "test".to_string(),
         error_message: None,
     };
-    
+
     match db::create_usage_log(&pool, usage_log).await {
         Ok(log) => {
             println!("Created usage log with ID: {}", log.id);
@@ -522,11 +551,11 @@ async fn demonstrate_db_usage() -> anyhow::Result<()> {
             println!("Error creating usage log: {}", e);
         }
     }
-    
+
     // Demonstrate provider usage
     let provider = crate::providers::openai::OpenAIProvider::new();
     println!("Created OpenAI provider: {:?}", provider.content_type());
-    
+
     // Demonstrate provider error handling
     let _result: crate::providers::Result<String> = Ok("Success".to_string());
 
@@ -539,7 +568,7 @@ async fn demonstrate_db_usage() -> anyhow::Result<()> {
 async fn start_tunnel(hostname: Option<String>) -> anyhow::Result<()> {
     // Initialize database connection first
     let _pool = db::init("sqlite://./llamp.db").await?;
-    
+
     // Get the server address from config
     let cli = config::Cli {
         admin_key: None,
@@ -552,9 +581,9 @@ async fn start_tunnel(hostname: Option<String>) -> anyhow::Result<()> {
     let server_url = format!("http://{}", config.get_address());
 
     tracing::info!("Starting Cloudflare tunnel...");
-    
+
     let mut tunnel = CloudflareTunnel::new(&server_url);
-    
+
     if let Some(ref hostname) = hostname {
         tunnel = tunnel.with_hostname(hostname);
     }

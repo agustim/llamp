@@ -1,9 +1,9 @@
+use crate::auth;
 use axum::{
+    middleware,
     routing::{get, post},
     Router,
-    middleware,
 };
-use crate::auth;
 
 pub async fn create_app() -> anyhow::Result<Router> {
     let app = Router::new()
@@ -12,10 +12,16 @@ pub async fn create_app() -> anyhow::Result<Router> {
         .route("/health", get(health_check))
         // Admin routes
         .route("/admin/backends", get(list_backends).post(create_backend))
-        .route("/admin/backends/:id", get(get_backend).put(update_backend).delete(delete_backend))
+        .route(
+            "/admin/backends/:id",
+            get(get_backend).put(update_backend).delete(delete_backend),
+        )
         .route("/admin/backends/:id/test", post(test_backend))
         .route("/admin/users", get(list_users).post(create_user))
-        .route("/admin/users/:id", get(get_user).put(update_user).delete(delete_user))
+        .route(
+            "/admin/users/:id",
+            get(get_user).put(update_user).delete(delete_user),
+        )
         .route("/admin/users/:id/regenerate-key", post(regenerate_user_key))
         .route("/admin/stats/overview", get(stats_overview))
         .route("/admin/stats/by-user", get(stats_by_user))

@@ -1,15 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use llamp::config::{Cli, Config};
     use clap::Parser;
+    use llamp::config::{Cli, Config};
 
     #[test]
     fn test_config_from_args() {
-        let cli = Cli::parse_from([
-            "llamp",
-            "--port", "3000",
-            "--host", "127.0.0.1",
-        ]);
+        let cli = Cli::parse_from(["llamp", "--port", "3000", "--host", "127.0.0.1"]);
 
         let config = Config::from_args(&cli).unwrap();
 
@@ -21,10 +17,7 @@ mod tests {
 
     #[test]
     fn test_config_custom_database() {
-        let cli = Cli::parse_from([
-            "llamp",
-            "--database", "sqlite://./custom.db",
-        ]);
+        let cli = Cli::parse_from(["llamp", "--database", "sqlite://./custom.db"]);
 
         let config = Config::from_args(&cli).unwrap();
 
@@ -33,10 +26,7 @@ mod tests {
 
     #[test]
     fn test_config_admin_key() {
-        let cli = Cli::parse_from([
-            "llamp",
-            "--admin-key", "my-secret-key",
-        ]);
+        let cli = Cli::parse_from(["llamp", "--admin-key", "my-secret-key"]);
 
         let config = Config::from_args(&cli).unwrap();
 
@@ -45,11 +35,7 @@ mod tests {
 
     #[test]
     fn test_config_get_address() {
-        let cli = Cli::parse_from([
-            "llamp",
-            "--port", "8080",
-            "--host", "0.0.0.0",
-        ]);
+        let cli = Cli::parse_from(["llamp", "--port", "8080", "--host", "0.0.0.0"]);
 
         let config = Config::from_args(&cli).unwrap();
         assert_eq!(config.get_address(), "0.0.0.0:8080");

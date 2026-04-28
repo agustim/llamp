@@ -1,6 +1,6 @@
 use anyhow::Result;
-use std::process::{Command, Stdio};
 use std::env;
+use std::process::{Command, Stdio};
 
 pub struct CloudflareTunnel {
     pub hostname: Option<String>,
@@ -24,14 +24,12 @@ impl CloudflareTunnel {
 
     /// Check if cloudflared is installed and get its version
     pub fn check_installed() -> Result<String> {
-        let output = Command::new("cloudflared")
-            .arg("--version")
-            .output()?;
-        
+        let output = Command::new("cloudflared").arg("--version").output()?;
+
         if !output.status.success() {
             anyhow::bail!("cloudflared is not installed or not in PATH");
         }
-        
+
         let version_str = String::from_utf8_lossy(&output.stdout);
         Ok(version_str.trim().to_string())
     }
@@ -44,7 +42,10 @@ impl CloudflareTunnel {
     /// Check if cloudflared supports the current architecture
     pub fn supports_current_arch() -> bool {
         let arch = Self::detect_arch();
-        matches!(arch.as_str(), "x86_64" | "aarch64" | "arm64" | "amd64" | "arm")
+        matches!(
+            arch.as_str(),
+            "x86_64" | "aarch64" | "arm64" | "amd64" | "arm"
+        )
     }
 
     pub fn start(&mut self) -> Result<()> {
@@ -123,8 +124,8 @@ mod tests {
 
     #[test]
     fn test_tunnel_with_hostname() {
-        let tunnel = CloudflareTunnel::new("http://localhost:8080")
-            .with_hostname("exemple.example.com");
+        let tunnel =
+            CloudflareTunnel::new("http://localhost:8080").with_hostname("exemple.example.com");
         assert_eq!(tunnel.hostname, Some("exemple.example.com".to_string()));
     }
 }
