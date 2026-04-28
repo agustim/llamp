@@ -7,7 +7,6 @@ mod proxy;
 mod tunnel;
 
 use clap::Parser;
-use uuid;
 use sqlx::Row;
 use crate::providers::LLMProvider;
 use crate::tunnel::CloudflareTunnel;

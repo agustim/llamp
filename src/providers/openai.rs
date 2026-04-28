@@ -6,6 +6,12 @@ use crate::providers::{LLMProvider, Result};
 pub struct OpenAIProvider {
 }
 
+impl Default for OpenAIProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OpenAIProvider {
     pub fn new() -> Self {
         Self {
