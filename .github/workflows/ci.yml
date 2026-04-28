@@ -60,7 +60,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install release-plz
-        uses: MarcoIeni/release-plz-action@v2
+        uses: MarcoIeni/release-plz-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
