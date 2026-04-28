@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Target directory (build artifacts)
+target
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Documentation
+README.md
+docs/
+
+# Test files
+tests/
+*_test.rs
+*.db
+llamp.db
+
+# Config files
+config/
+
+# Build scripts
+*.sh
+build-cross.sh
+extract_binaries.sh
+release.sh
+
+# Docker files
+Dockerfile.cross
+
+# Cache
+.cache
+
+# CI/CD
+.github/
