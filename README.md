@@ -12,6 +12,8 @@ I, etc.), handling protocol translation, user authentication, consumption limits
 - **Usage Tracking**: Detailed logging of token consumption and costs
 - **Resilience**: Automatic retries, circuit breaker, and health checks
 - **Security**: Secure authentication with proxy keys
+- **Multi-Architecture Support**: Runs on x86_64 (amd64) and ARM64 (aarch64) systems
+- **Cloudflare Tunnel Integration**: Expose your local server via Cloudflare tunnels
 
 ## Architecture
 
@@ -25,7 +27,8 @@ llamp/
 │   ├── providers/               # LLM provider implementations
 │   ├── proxy/                  # Core proxy functionality
 │   ├── auth.rs                # Authentication middleware
-│   └── rate_limit.rs         # Rate limiting implementation
+│   ├── rate_limit.rs         # Rate limiting implementation
+│   └── tunnel/               # Cloudflare tunnel management
 ├── migrations/                 # Database migrations
 ├── Cargo.toml               # Dependencies
 └── llamp.toml              # Default configuration
@@ -108,3 +111,33 @@ Llamp can be configured through:
 ## License
 
 MIT
+
+## Multi-Architecture Support
+
+Llamp is designed to work on multiple architectures:
+
+- **x86_64 / amd64**: Standard desktop and server architecture
+- **aarch64 / arm64**: ARM-based systems (Raspberry Pi, Apple Silicon, etc.)
+
+### Cloudflare Tunnel Support
+
+Llamp includes built-in support for Cloudflare Tunnels to expose your local server:
+
+```bash
+# Install cloudflared (required)
+# See: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
+
+# Start a tunnel
+llamp tunnel start --hostname yourdomain.example.com
+
+# Check tunnel status
+llamp tunnel status
+
+# Stop the tunnel
+llamp tunnel stop
+```
+
+The tunnel automatically:
+- Detects your system architecture
+- Logs version and architecture information
+- Provides secure HTTPS access via Cloudflare's network

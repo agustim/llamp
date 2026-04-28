@@ -4,11 +4,22 @@ mod models;
 mod providers;
 mod auth;
 mod proxy;
+mod tunnel;
 
 use clap::Parser;
 use uuid;
 use sqlx::Row;
 use crate::providers::LLMProvider;
+use crate::tunnel::CloudflareTunnel;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+// Global tunnel process - wrapped in Mutex for thread safety
+// Using lazy_static for thread-safe global state
+lazy_static::lazy_static! {
+    static ref TUNNEL_PROCESS: Arc<Mutex<Option<Arc<Mutex<CloudflareTunnel>>>>> = 
+        Arc::new(Mutex::new(None));
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Llamp - Universal LLM Gateway", long_about = None)]
@@ -55,6 +66,27 @@ enum LlampCli {
     /// Demonstrate database functions (for testing unused functions)
     #[command(name = "demo")]
     Demo,
+
+    /// Manage Cloudflare tunnels
+    #[command(name = "tunnel")]
+    Tunnel {
+        #[command(subcommand)]
+        action: TunnelCommands,
+    },
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum TunnelCommands {
+    /// Start a Cloudflare tunnel
+    Start {
+        /// Hostname for the tunnel
+        #[arg(long)]
+        hostname: Option<String>,
+    },
+    /// Show tunnel status
+    Status,
+    /// Stop the running tunnel
+    Stop,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -181,6 +213,19 @@ async fn main() -> anyhow::Result<()> {
         LlampCli::Demo => {
             demonstrate_db_usage().await
         }
+        LlampCli::Tunnel { action } => {
+            match action {
+                TunnelCommands::Start { hostname } => {
+                    start_tunnel(hostname).await
+                }
+                TunnelCommands::Status => {
+                    tunnel_status().await
+                }
+                TunnelCommands::Stop => {
+                    stop_tunnel().await
+                }
+            }
+        }
     }
 }
 
@@ -198,6 +243,9 @@ async fn run_server(port: u16, host: String, database_url: String, admin_key: Op
     let config = config::Config::from_args(&cli)?;
 
     tracing::info!("Starting Llamp server with config: {:?}", config);
+
+    // Show architecture info
+    tracing::info!("System architecture: {}", CloudflareTunnel::detect_arch());
 
     // Initialize database connection using the config
     let _pool = db::init(&config.database_url).await?;
@@ -482,6 +530,86 @@ async fn demonstrate_db_usage() -> anyhow::Result<()> {
     
     // Demonstrate provider error handling
     let _result: crate::providers::Result<String> = Ok("Success".to_string());
+
+    Ok(())
+}
+
+// Cloudflare Tunnel management functions
+// TUNNEL_PROCESS is defined in the lazy_static! block above
+
+async fn start_tunnel(hostname: Option<String>) -> anyhow::Result<()> {
+    // Initialize database connection first
+    let _pool = db::init("sqlite://./llamp.db").await?;
     
+    // Get the server address from config
+    let cli = config::Cli {
+        admin_key: None,
+        port: 8080,
+        host: "localhost".to_string(),
+        config: None,
+        database: Some("sqlite://./llamp.db".to_string()),
+    };
+    let config = config::Config::from_args(&cli)?;
+    let server_url = format!("http://{}", config.get_address());
+
+    tracing::info!("Starting Cloudflare tunnel...");
+    
+    let mut tunnel = CloudflareTunnel::new(&server_url);
+    
+    if let Some(ref hostname) = hostname {
+        tunnel = tunnel.with_hostname(hostname);
+    }
+
+    tunnel.start()?;
+
+    // Store the tunnel process globally with Mutex
+    let mut tunnel_ref = TUNNEL_PROCESS.lock().await;
+    *tunnel_ref = Some(Arc::new(Mutex::new(tunnel)));
+
+    tracing::info!("Cloudflare tunnel started successfully");
+
+    // Keep the process running
+    println!("Tunnel is running. Press Ctrl+C to stop.");
+    println!("System architecture: {}", CloudflareTunnel::detect_arch());
+
+    // Simple loop to keep the program running
+    tokio::signal::ctrl_c().await?;
+
+    Ok(())
+}
+
+async fn tunnel_status() -> anyhow::Result<()> {
+    let tunnel_ref = TUNNEL_PROCESS.lock().await;
+    match &*tunnel_ref {
+        Some(tunnel) => {
+            let tunnel_guard = tunnel.lock().await;
+            if tunnel_guard.is_running() {
+                println!("Cloudflare tunnel is running");
+                println!("URL: {}", tunnel_guard.url);
+                if let Some(ref hostname) = tunnel_guard.hostname {
+                    println!("Hostname: {}", hostname);
+                }
+                println!("System architecture: {}", CloudflareTunnel::detect_arch());
+            } else {
+                println!("Cloudflare tunnel is not running");
+            }
+        }
+        None => {
+            println!("Cloudflare tunnel is not running");
+        }
+    }
+    Ok(())
+}
+
+async fn stop_tunnel() -> anyhow::Result<()> {
+    let mut tunnel_ref = TUNNEL_PROCESS.lock().await;
+    if let Some(tunnel) = (*tunnel_ref).take() {
+        drop(tunnel_ref);
+        let mut tunnel_guard = tunnel.lock().await;
+        tunnel_guard.stop()?;
+        println!("Cloudflare tunnel stopped");
+    } else {
+        println!("Cloudflare tunnel was not running");
+    }
     Ok(())
 }

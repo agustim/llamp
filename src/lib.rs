@@ -4,6 +4,7 @@ pub mod providers;
 pub mod auth;
 pub mod config;
 pub mod proxy;
+pub mod tunnel;
 
 // Remove the glob imports that cause conflicts
 pub use db::*;
