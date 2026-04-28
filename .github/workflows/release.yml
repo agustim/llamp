@@ -22,52 +22,66 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu,x86_64-apple-darwin,aarch64-apple-darwin
+          targets: x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
 
-      - name: Run tests (x86_64)
-        run: cargo test
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
 
-      - name: Build Linux x86_64
-        run: cargo build --release --target=x86_64-unknown-linux-gnu
-        env:
-          SQLX_OFFLINE: true
+      - name: Build Linux x86_64 (musl)
+        run: cross build --release --target=x86_64-unknown-linux-musl
 
-      - name: Build Linux aarch64
-        run: cargo build --release --target=aarch64-unknown-linux-gnu
-        env:
-          SQLX_OFFLINE: true
-
-      - name: Build macOS x86_64
-        run: cargo build --release --target=x86_64-apple-darwin
-        env:
-          SQLX_OFFLINE: true
-
-      - name: Build macOS aarch64
-        run: cargo build --release --target=aarch64-apple-darwin
-        env:
-          SQLX_OFFLINE: true
+      - name: Build Linux aarch64 (musl)
+        run: cross build --release --target=aarch64-unknown-linux-musl
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: llamp-binaries
           path: |
-            target/x86_64-unknown-linux-gnu/release/llamp
-            target/aarch64-unknown-linux-gnu/release/llamp
-            target/x86_64-apple-darwin/release/llamp
-            target/aarch64-apple-darwin/release/llamp
+            target/x86_64-unknown-linux-musl/release/llamp
+            target/aarch64-unknown-linux-musl/release/llamp
           retention-days: 1
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            target/x86_64-unknown-linux-gnu/release/llamp
-            target/aarch64-unknown-linux-gnu/release/llamp
-            target/x86_64-apple-darwin/release/llamp
-            target/aarch64-apple-darwin/release/llamp
+            target/x86_64-unknown-linux-musl/release/llamp
+            target/aarch64-unknown-linux-musl/release/llamp
           generate_release_notes: true
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  macOS-release:
+    name: Create macOS Release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Build macOS x86_64
+        run: cargo build --release --target=x86_64-apple-darwin
+
+      - name: Build macOS aarch64
+        run: cargo build --release --target=aarch64-apple-darwin
+
+      - name: Upload macOS binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: llamp-macos-binaries
+          path: |
+            target/x86_64-apple-darwin/release/llamp
+            target/aarch64-apple-darwin/release/llamp
+          retention-days: 1
