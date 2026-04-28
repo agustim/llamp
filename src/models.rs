@@ -84,6 +84,30 @@ pub struct NewUsageLog {
     pub error_message: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateBackend {
+    pub provider_type: Option<String>,
+    pub display_name: Option<String>,
+    pub model_alias: Option<String>,
+    pub model_name: Option<String>,
+    pub endpoint_url: Option<String>,
+    pub api_key: Option<Option<String>>,
+    pub additional_config: Option<Option<String>>,
+    pub cost_per_input_token: Option<Option<f64>>,
+    pub cost_per_output_token: Option<Option<f64>>,
+    pub max_request_timeout_s: Option<Option<i32>>,
+    pub active: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateUser {
+    pub username: Option<String>,
+    pub enabled: Option<bool>,
+    pub allowed_backends: Option<Option<String>>,
+    pub rate_limit_requests_per_minute: Option<Option<i32>>,
+    pub monthly_token_budget: Option<Option<i64>>,
+}
+
 // OpenAI API compatible structures
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatCompletionRequest {

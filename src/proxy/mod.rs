@@ -1,9 +1,12 @@
 use crate::auth;
+use crate::db;
 use axum::{
+    http::StatusCode,
     middleware,
     routing::{get, post},
-    Router,
+    Json, Router,
 };
+use serde_json::json;
 
 pub async fn create_app() -> anyhow::Result<Router> {
     let app = Router::new()
@@ -42,8 +45,30 @@ async fn chat_completions() -> String {
     "Chat completions endpoint - placeholder implementation".to_string()
 }
 
-async fn list_models() -> &'static str {
-    "List models endpoint"
+async fn list_models() -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    // Create a database pool
+    let pool = db::init("sqlite://./llamp.db").await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to connect to database: {}", e)))?;
+
+    // Get all active backends
+    let backends = db::get_all_backends(&pool).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to fetch backends: {}", e)))?;
+
+    // Transform backends into the expected JSON format
+    let models: Vec<serde_json::Value> = backends.into_iter().map(|backend| {
+        json!({
+            "id": backend.model_alias,
+            "object": "model",
+            "created": 1234567890, // Placeholder timestamp
+            "owned_by": "llamp"
+        })
+    }).collect();
+
+    // Return the models as JSON
+    Ok(Json(json!({
+        "object": "list",
+        "data": models
+    })))
 }
 
 async fn health_check() -> &'static str {
