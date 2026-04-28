@@ -35,7 +35,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Release-plz
-        uses: MarcoIeni/release-plz-action@v1
+        uses: MarcoIeni/release-plz-action@v0.5.128
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           command: release-pr
