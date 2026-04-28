@@ -36,7 +36,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Install SQLx CLI
-        run: cargo install sqlx-cli --no-default-features --features sqlite
+        run: cargo install sqlx-cli --no-default-features --features sqlite --force
 
       - name: Run cargo fmt
         run: cargo fmt --check
