@@ -1,5 +1,7 @@
 # Llamp - Rust Universal LLM Gateway
 
+# Llamp - Rust Universal LLM Gateway
+
 Llamp is a high-performance proxy written in Rust that centralizes calls to language models from external services (internet). The system redirects requests to multiple providers (OpenAI, Anthropic, Google Gemini, Groq, Azure OpenA
 I, etc.), handling protocol translation, user authentication, consumption limits, and detailed logging.
 
