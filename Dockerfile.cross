@@ -8,6 +8,7 @@ RUN dpkg --add-architecture arm64 && apt-get update && apt-get install -y \
     libssl-dev \
     pkg-config \
     gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
     libc6-dev:arm64 \
     libssl-dev:arm64 \
     pkg-config:arm64 \
@@ -32,9 +33,14 @@ RUN rustup target add aarch64-unknown-linux-gnu
 
 # Set environment variables for ARM64 cross-compilation
 ENV CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
+    CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
     AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar \
     PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig \
-    PKG_CONFIG_ALLOW_CROSS=1
+    PKG_CONFIG_ALLOW_CROSS=1 \
+    LINKER=aarch64-linux-gnu-ld
+
+# Clean any previous build artifacts for aarch64
+RUN rm -rf target/aarch64-unknown-linux-gnu/release
 
 # Build for aarch64
 RUN cargo build --release --target=aarch64-unknown-linux-gnu
