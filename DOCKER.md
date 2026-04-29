@@ -21,6 +21,7 @@ We provide pre-built images for multiple architectures:
 
 - `linux/amd64` (x86_64)
 - `linux/arm64` (aarch64)
+- `linux/arm/v7` (armv7)
 
 You can use the appropriate image tag or let Docker automatically select the correct architecture.
 
@@ -32,10 +33,30 @@ You can use the appropriate image tag or let Docker automatically select the cor
 docker build -t llamp:latest .
 ```
 
-### Cross-Compilation Build
+### Cross-Compilation Build (recommended for releases)
 
 ```bash
-docker build -f Dockerfile.cross -t llamp:cross .
+docker build -f Dockerfile.cross -t llamp-builder .
+```
+
+This creates a Docker image that contains binaries for all supported architectures:
+- `llamp-x86_64` - Linux Intel/AMD 64-bit
+- `llamp-aarch64` - Linux ARM 64-bit
+- `llamp-armv7` - Linux ARM v7
+
+### Extract Binaries from Cross-Compilation Image
+
+```bash
+# Create a temporary container
+docker create --name temp-extract llamp-builder
+
+# Extract binaries
+docker cp temp-extract:/app/llamp-x86_64 ./llamp-x86_64
+docker cp temp-extract:/app/llamp-aarch64 ./llamp-aarch64
+docker cp temp-extract:/app/llamp-armv7 ./llamp-armv7
+
+# Clean up
+docker rm temp-extract
 ```
 
 ### Multi-Platform Build
@@ -47,6 +68,20 @@ docker buildx build \
   --push \
   .
 ```
+
+## Cross-Compilation with Docker (Detailed)
+
+The `Dockerfile.cross` uses Docker to cross-compile Llamp for multiple Linux architectures:
+
+1. Uses a Rust base image with all necessary build tools
+2. Installs cross-compilation toolchains for ARM targets
+3. Builds binaries for x86_64, aarch64, and armv7
+4. Packages all binaries in a minimal Debian runtime image
+
+This approach ensures:
+- **Consistent builds** across different development environments
+- **No need to configure cross-compilation** on your local machine
+- **Reproducible releases** using the same Docker image
 
 ## Configuration
 
@@ -77,7 +112,7 @@ Llamp uses SQLite by default. Mount a volume for persistence:
 ## Tags
 
 - `latest` - Latest stable release
-- `v0.2.0` - Specific version tag
+- `v0.3.0` - Specific version tag
 - `main` - Latest from main branch
 
 ## License
