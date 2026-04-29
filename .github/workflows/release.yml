@@ -9,84 +9,30 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Create Release
+  download-binaries:
+    name: Download cross-compiled binaries
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu
-
-      - name: Install OpenSSL for x86_64
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
-
-      - name: Build Linux x86_64
-        run: cargo build --release --target=x86_64-unknown-linux-gnu
-
-      - name: Build Linux aarch64
-        run: |
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y libssl-dev:arm64 pkg-config:arm64
-          cargo build --release --target=aarch64-unknown-linux-gnu
-        env:
-          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig
-          PKG_CONFIG_ALLOW_CROSS: 1
-
-      - name: Upload binaries
-        uses: actions/upload-artifact@v4
+      - name: Download binaries from Docker build
+        uses: actions/download-artifact@v4
         with:
           name: llamp-binaries
-          path: |
-            target/x86_64-unknown-linux-gnu/release/llamp
-            target/aarch64-unknown-linux-gnu/release/llamp
-          retention-days: 1
+          path: release/
+
+      - name: Verify binaries
+        run: |
+          ls -la release/
+          file release/*
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            target/x86_64-unknown-linux-gnu/release/llamp
-            target/aarch64-unknown-linux-gnu/release/llamp
+            release/llamp-x86_64-unknown-linux-gnu
+            release/llamp-aarch64-unknown-linux-gnu
+            release/llamp-armv7-unknown-linux-gnueabihf
           generate_release_notes: true
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  macOS-release:
-    name: Create macOS Release
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-          targets: x86_64-apple-darwin,aarch64-apple-darwin
-
-      - name: Build macOS x86_64
-        run: cargo build --release --target=x86_64-apple-darwin
-
-      - name: Build macOS aarch64
-        run: cargo build --release --target=aarch64-apple-darwin
-
-      - name: Upload macOS binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: llamp-macos-binaries
-          path: |
-            target/x86_64-apple-darwin/release/llamp
-            target/aarch64-apple-darwin/release/llamp
-          retention-days: 1
