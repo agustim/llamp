@@ -18,7 +18,6 @@ Runs on every push to `main`/`develop` and pull requests:
 1. **Build Job**: Uses Docker Buildx to build multi-architecture Docker images for:
    - Linux amd64 (x86_64)
    - Linux arm64 (aarch64)
-   - Linux arm/v7 (armv7)
 
 ### Release Workflow (`.github/workflows/release.yml`)
 
@@ -27,7 +26,6 @@ Runs when a new tag is pushed (e.g., `v0.3.0`):
 1. **Build Job**: Uses Docker to cross-compile binaries for all architectures:
    - Linux amd64 (x86_64)
    - Linux arm64 (aarch64)
-   - Linux armv7 (armv7)
 2. **Release Job**: Creates a GitHub release with all binaries
 
 ## Creating a Release
@@ -53,7 +51,6 @@ git push origin v0.3.0
 Each release includes binaries for:
 - `llamp-x86_64-unknown-linux-gnu` - Linux Intel/AMD 64-bit
 - `llamp-aarch64-unknown-linux-gnu` - Linux ARM 64-bit (Raspberry Pi, ARM servers)
-- `llamp-armv7-unknown-linux-gnueabihf` - Linux ARM v7 (older ARM devices)
 
 ## Versioning
 
@@ -79,7 +76,7 @@ The Docker-based cross-compilation approach provides:
 1. Push a tag (e.g., `v0.3.0`)
 2. Release workflow runs:
    - Builds Docker image with cross-compilation tools
-   - Compiles binaries for x86_64, aarch64, and armv7
+   - Compiles binaries for x86_64 and aarch64
    - Extracts binaries from Docker image
    - Uploads binaries as artifacts
 3. Release job:
