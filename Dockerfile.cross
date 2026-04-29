@@ -33,10 +33,7 @@ RUN rustup target add aarch64-unknown-linux-gnu
 
 # Create a .cargo/config.toml file to configure the cross-compiler
 RUN mkdir -p /home/builder/.cargo
-RUN echo '[target.aarch64-unknown-linux-gnu]
- linker = "aarch64-linux-gnu-gcc"
- ar = "aarch64-linux-gnu-ar"
-' > /home/builder/.cargo/config.toml
+RUN printf '[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"\nar = "aarch64-linux-gnu-ar"\n' > /home/builder/.cargo/config.toml
 
 # Set environment variables for ARM64 cross-compilation
 ENV CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
