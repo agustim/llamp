@@ -44,7 +44,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   docker-macos:
-    name: Build for macOS
+    name: Build for Linux on macOS runner
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -64,12 +64,12 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build multi-arch Docker image (macOS)
+      - name: Build multi-arch Docker image (Linux on macOS runner)
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
-          platforms: darwin/amd64,darwin/arm64
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
