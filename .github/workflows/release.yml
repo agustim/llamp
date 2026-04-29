@@ -9,93 +9,45 @@ permissions:
   contents: write
 
 jobs:
-  build-binaries:
-    name: Build binaries for all architectures
+  build-with-docker:
+    name: Build binaries with Docker
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu,armv7-unknown-linux-gnueabihf,arm-unknown-linux-gnueabihf
-
-      - name: Cache Cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
-
-      - name: Cache Cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-
-
-      - name: Install cross-compilation dependencies
+      - name: Build cross-compiled binaries with Docker
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config
+          docker build -f Dockerfile.cross -t llamp-builder .
+          mkdir -p release
+          docker create --name temp-extract llamp-builder > /dev/null
+          docker cp temp-extract:/app/llamp-x86_64 ./release/llamp-x86_64-unknown-linux-gnu
+          docker cp temp-extract:/app/llamp-aarch64 ./release/llamp-aarch64-unknown-linux-gnu
+          docker cp temp-extract:/app/llamp-armv7 ./release/llamp-armv7-unknown-linux-gnueabihf
+          docker rm temp-extract > /dev/null
 
-      - name: Build for x86_64
-        run: cargo build --release --target=x86_64-unknown-linux-gnu
-
-      - name: Build for aarch64
+      - name: Verify binaries
         run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          cargo build --release --target=aarch64-unknown-linux-gnu
-        env:
-          CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
-          PKG_CONFIG_ALLOW_CROSS=1
-
-      - name: Build for armv7
-        run: |
-          sudo apt-get install -y gcc-arm-linux-gnueabihf
-          cargo build --release --target=armv7-unknown-linux-gnueabihf
-        env:
-          CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc
-
-      - name: Build for arm (v6)
-        run: |
-          cargo build --release --target=arm-unknown-linux-gnueabihf
-        env:
-          CC_arm_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc
+          ls -la release/
+          file release/*
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: llamp-binaries
-          path: |
-            target/x86_64-unknown-linux-gnu/release/llamp
-            target/aarch64-unknown-linux-gnu/release/llamp
-            target/armv7-unknown-linux-gnueabihf/release/llamp
-            target/arm-unknown-linux-gnueabihf/release/llamp
+          path: release/
           retention-days: 1
 
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: build-binaries
+    needs: build-with-docker
     steps:
       - name: Download binaries
         uses: actions/download-artifact@v4
         with:
           name: llamp-binaries
           path: release/
-
-      - name: Rename binaries
-        run: |
-          mv release/llamp release/llamp-x86_64-unknown-linux-gnu
-          mv release/llamp release/llamp-aarch64-unknown-linux-gnu
-          mv release/llamp release/llamp-armv7-unknown-linux-gnueabihf
-          mv release/llamp release/llamp-arm-unknown-linux-gnueabihf
 
       - name: Verify binaries
         run: |
@@ -109,7 +61,6 @@ jobs:
             release/llamp-x86_64-unknown-linux-gnu
             release/llamp-aarch64-unknown-linux-gnu
             release/llamp-armv7-unknown-linux-gnueabihf
-            release/llamp-arm-unknown-linux-gnueabihf
           generate_release_notes: true
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}

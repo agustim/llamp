@@ -11,31 +11,34 @@ on:
       - main
 
 jobs:
-  build-cross:
-    name: Cross-compile binaries with Docker
+  docker-linux:
+    name: Build and Push Docker Image (Linux)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build cross-compiled binaries with Docker
-        run: |
-          docker build -f Dockerfile.cross -t llamp-builder .
-          mkdir -p release
-          docker create --name temp-extract llamp-builder > /dev/null
-          docker cp temp-extract:/app/llamp-x86_64 ./release/llamp-x86_64-unknown-linux-gnu
-          docker cp temp-extract:/app/llamp-aarch64 ./release/llamp-aarch64-unknown-linux-gnu
-          docker cp temp-extract:/app/llamp-armv7 ./release/llamp-armv7-unknown-linux-gnueabihf
-          docker rm temp-extract > /dev/null
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Verify binaries
-        run: |
-          ls -la release/
-          file release/*
-
-      - name: Upload binaries
-        uses: actions/upload-artifact@v4
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          name: llamp-binaries
-          path: release/
-          retention-days: 1
+          images: agustim/llamp
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build multi-arch Docker image (Linux)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
