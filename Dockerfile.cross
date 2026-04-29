@@ -8,7 +8,6 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     pkg-config \
     gcc-aarch64-linux-gnu \
-    gcc-arm-linux-gnueabihf \
     && rm -rf /var/lib/apt/lists/*
 
 # Create build user to avoid root
@@ -28,9 +27,6 @@ RUN cargo build --release --target=x86_64-unknown-linux-gnu
 # Install ARM64 target
 RUN rustup target add aarch64-unknown-linux-gnu
 
-# Install ARM v7 target
-RUN rustup target add armv7-unknown-linux-gnueabihf
-
 # Set environment variables for ARM64 cross-compilation
 ENV CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
     AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar \
@@ -39,20 +35,12 @@ ENV CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
 # Build for aarch64
 RUN cargo build --release --target=aarch64-unknown-linux-gnu
 
-# Set environment variables for ARM v7 cross-compilation
-ENV CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc \
-    AR_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-ar
-
-# Build for armv7
-RUN cargo build --release --target=armv7-unknown-linux-gnueabihf
-
 # Create release directory
 RUN mkdir -p /home/builder/release
 
 # Copy binaries to release directory
 RUN cp target/x86_64-unknown-linux-gnu/release/llamp /home/builder/release/llamp-x86_64
 RUN cp target/aarch64-unknown-linux-gnu/release/llamp /home/builder/release/llamp-aarch64
-RUN cp target/armv7-unknown-linux-gnueabihf/release/llamp /home/builder/release/llamp-armv7
 
 # Final minimal image for distribution
 FROM debian:bookworm-slim

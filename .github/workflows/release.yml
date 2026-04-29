@@ -23,7 +23,6 @@ jobs:
           docker create --name temp-extract llamp-builder > /dev/null
           docker cp temp-extract:/app/llamp-x86_64 ./release/llamp-x86_64-unknown-linux-gnu
           docker cp temp-extract:/app/llamp-aarch64 ./release/llamp-aarch64-unknown-linux-gnu
-          docker cp temp-extract:/app/llamp-armv7 ./release/llamp-armv7-unknown-linux-gnueabihf
           docker rm temp-extract > /dev/null
 
       - name: Verify binaries
@@ -60,7 +59,6 @@ jobs:
           files: |
             release/llamp-x86_64-unknown-linux-gnu
             release/llamp-aarch64-unknown-linux-gnu
-            release/llamp-armv7-unknown-linux-gnueabihf
           generate_release_notes: true
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
