@@ -98,15 +98,19 @@ impl LLMProvider for OpenAIProvider {
         }
 
         let json_str = line.trim_start_matches("data: ").trim();
-        
+
         // Skip empty lines and "[DONE]" marker
         if json_str.is_empty() || json_str == "[DONE]" {
             return Ok(None);
         }
 
+        // Log the raw chunk for debugging
+        tracing::debug!(chunk = json_str, "Parsing streaming chunk");
+
         let chunk: OpenAIStreamChunk = serde_json::from_str(json_str)
             .map_err(|e| ProviderError::JsonError(e))?;
 
+        tracing::debug!(chunk = ?chunk, "Parsed streaming chunk");
         Ok(Some(chunk))
     }
 

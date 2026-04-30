@@ -232,6 +232,9 @@ fn process_backend_response(
                     continue;
                 }
 
+                // Log the chunk for debugging
+                tracing::debug!(chunk = json_str, "Processing streaming chunk");
+
                 match serde_json::from_str::<serde_json::Value>(json_str) {
                     Ok(value) => {
                         match provider.parse_streaming_chunk(line.as_bytes()) {
@@ -240,6 +243,7 @@ fn process_backend_response(
                                 if let Some(choice) = chunk.choices.first() {
                                     if let Some(delta) = &choice.delta {
                                         if let Some(content) = &delta.content {
+                                            tracing::debug!(content = content, "Adding content from chunk");
                                             final_content.push_str(content);
                                         }
                                     }
@@ -255,7 +259,7 @@ fn process_backend_response(
                                 last_id = value.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
                             }
                             Ok(None) => {
-                                // Skip chunk without data
+                                tracing::debug!("Skipping chunk without data");
                             }
                             Err(e) => {
                                 tracing::warn!(error = %e, "Failed to parse streaming chunk");
@@ -263,7 +267,7 @@ fn process_backend_response(
                         }
                     }
                     Err(e) => {
-                        tracing::warn!(error = %e, "Failed to parse streaming chunk");
+                        tracing::warn!(error = %e, "Failed to parse chunk JSON");
                     }
                 }
             }
