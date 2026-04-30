@@ -37,11 +37,12 @@ impl LLMProvider for OpenAIProvider {
         );
 
         // Create the request body for the provider
-        // Force stream=false to ensure we get complete responses
+        // Respect the stream parameter from the original request
+        let stream = req.stream.unwrap_or(false);
         let mut body = serde_json::json!({
             "model": backend.model_name,
             "messages": req.messages,
-            "stream": false,
+            "stream": stream,
         });
 
         // Add optional parameters if they exist in the original request
