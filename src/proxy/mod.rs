@@ -128,6 +128,30 @@ async fn chat_completions(
         );
     }
 
+    // If backend returned an error, pass it through
+    if status >= 400 {
+        tracing::warn!(
+            user_id = user.id,
+            backend_status = status,
+            response_body_preview = %response_body.chars().take(200).collect::<String>(),
+            "Backend returned error, passing through"
+        );
+        return Err((
+            match status {
+                400 => StatusCode::BAD_REQUEST,
+                401 => StatusCode::UNAUTHORIZED,
+                403 => StatusCode::FORBIDDEN,
+                404 => StatusCode::NOT_FOUND,
+                429 => StatusCode::TOO_MANY_REQUESTS,
+                500 => StatusCode::INTERNAL_SERVER_ERROR,
+                502 => StatusCode::BAD_GATEWAY,
+                503 => StatusCode::SERVICE_UNAVAILABLE,
+                _ => StatusCode::BAD_GATEWAY,
+            },
+            response_body,
+        ));
+    }
+
     // Process the backend response (handles both streaming and non-streaming)
     let processed_response = process_backend_response(&response_body, &provider)?;
 
