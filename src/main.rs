@@ -78,6 +78,12 @@ enum LlampCli {
 enum TunnelCommands {
     /// Start a Cloudflare tunnel
     Start {
+        /// URL of the local server to expose (for unconfigured services)
+        #[arg(long)]
+        url: Option<String>,
+        /// Execution token for pre-configured services
+        #[arg(long)]
+        token: Option<String>,
         /// Hostname for the tunnel
         #[arg(long)]
         hostname: Option<String>,
@@ -228,7 +234,7 @@ async fn main() -> anyhow::Result<()> {
         },
         LlampCli::Demo => demonstrate_db_usage().await,
         LlampCli::Tunnel { action } => match action {
-            TunnelCommands::Start { hostname } => start_tunnel(hostname).await,
+            TunnelCommands::Start { url: _, token: _, hostname } => start_tunnel(hostname).await,
             TunnelCommands::Status => tunnel_status().await,
             TunnelCommands::Stop => stop_tunnel().await,
         },

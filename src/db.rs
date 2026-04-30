@@ -91,6 +91,20 @@ pub async fn get_all_backends(pool: &SqlitePool) -> anyhow::Result<Vec<Backend>>
     Ok(result)
 }
 
+pub async fn get_backend_by_id(pool: &SqlitePool, id: i64) -> anyhow::Result<Option<Backend>> {
+    let result = sqlx::query_as::<_, Backend>(
+        "SELECT id, provider_type, display_name, model_alias, model_name, endpoint_url, api_key,
+                additional_config, cost_per_input_token, cost_per_output_token, max_request_timeout_s,
+                active, created_at, updated_at
+         FROM backends WHERE id = ? AND active = TRUE"
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(result)
+}
+
 pub async fn create_backend(pool: &SqlitePool, backend: NewBackend) -> anyhow::Result<Backend> {
     // Start a transaction explicitly
     let mut tx = pool.begin().await?;
@@ -274,6 +288,19 @@ pub async fn get_all_users(pool: &SqlitePool) -> anyhow::Result<Vec<User>> {
          FROM users",
     )
     .fetch_all(pool)
+    .await?;
+
+    Ok(result)
+}
+
+pub async fn get_user_by_id(pool: &SqlitePool, id: i64) -> anyhow::Result<Option<User>> {
+    let result = sqlx::query_as::<_, User>(
+        "SELECT id, username, proxy_key, enabled, allowed_backends, rate_limit_requests_per_minute,
+                monthly_token_budget, created_at, updated_at
+         FROM users WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
     .await?;
 
     Ok(result)

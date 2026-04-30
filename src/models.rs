@@ -121,10 +121,46 @@ pub struct ChatCompletionRequest {
     // Add other OpenAI API fields as needed
 }
 
+use serde::de::Deserializer;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ContentPart {
+    #[serde(rename = "type")]
+    pub part_type: String,
+    pub text: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
     pub role: String,
+    #[serde(deserialize_with = "deserialize_content")]
     pub content: String,
+}
+
+fn deserialize_content<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Content {
+        String(String),
+        Array(Vec<ContentPart>),
+    }
+
+    let content = Content::deserialize(deserializer)?;
+
+    match content {
+        Content::String(s) => Ok(s),
+        Content::Array(parts) => {
+            // Join all text parts with newlines
+            let text: Vec<&str> = parts
+                .iter()
+                .filter_map(|p| p.text.as_deref())
+                .collect();
+            Ok(text.join("\n"))
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

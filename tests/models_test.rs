@@ -181,4 +181,54 @@ mod tests {
             finish_reason: None,
         };
     }
+
+    #[test]
+    fn test_message_content_as_string() {
+        // Test deserializing content as a simple string (OpenAI format)
+        let json = r#"{"role":"user","content":"Hello world"}"#;
+        let message: Message = serde_json::from_str(json).unwrap();
+        
+        assert_eq!(message.role, "user");
+        assert_eq!(message.content, "Hello world");
+    }
+
+    #[test]
+    fn test_message_content_as_array() {
+        // Test deserializing content as an array (Qwen/ multimodal format)
+        let json = r#"{"role":"user","content":[{"type":"text","text":"Hello world"}]}"#;
+        let message: Message = serde_json::from_str(json).unwrap();
+        
+        assert_eq!(message.role, "user");
+        assert_eq!(message.content, "Hello world");
+    }
+
+    #[test]
+    fn test_message_content_array_multiple_parts() {
+        // Test deserializing content with multiple text parts
+        let json = r#"{"role":"user","content":[{"type":"text","text":"First line"},{"type":"text","text":"Second line"}]}"#;
+        let message: Message = serde_json::from_str(json).unwrap();
+        
+        assert_eq!(message.role, "user");
+        assert_eq!(message.content, "First line\nSecond line");
+    }
+
+    #[test]
+    fn test_chat_completion_request_with_array_content() {
+        // Test that ChatCompletionRequest can handle array content
+        let json = r#"
+        {
+            "model": "gpt-4",
+            "messages": [
+                {"role": "user", "content": [{"type": "text", "text": "Hello"}]}
+            ],
+            "stream": true
+        }
+        "#;
+        
+        let request: ChatCompletionRequest = serde_json::from_str(json).unwrap();
+        
+        assert_eq!(request.model, "gpt-4");
+        assert_eq!(request.messages.len(), 1);
+        assert_eq!(request.messages[0].content, "Hello");
+    }
 }
