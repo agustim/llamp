@@ -22,15 +22,8 @@ use crate::auth;
 use crate::providers::openai::OpenAIProvider;
 use crate::providers::LLMProvider;
 
-// Import the logging module
-mod logging;
-use crate::proxy::logging::logging_middleware;
-
 pub async fn create_app(log_level: String) -> anyhow::Result<Router> {
-    // Determine if we should enable verbose logging
-    let is_debug = log_level.to_lowercase() == "debug";
-
-    let app = Router::new()
+    Ok(Router::new()
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/models", get(list_models))
         .route("/health", get(health_check))
@@ -51,22 +44,36 @@ pub async fn create_app(log_level: String) -> anyhow::Result<Router> {
         .route("/admin/stats/by-user", get(stats_by_user))
         .route("/admin/stats/by-model", get(stats_by_model))
         .route("/admin/logs", get(get_logs))
-        // Apply logging middleware to all routes
-        .route_layer(middleware::from_fn(logging_middleware))
         // Apply auth middleware to protected routes
-        .layer(middleware::from_fn(auth::auth_middleware));
-
-    if is_debug {
-        tracing::debug!("Verbose logging enabled for all requests");
-    }
-
-    Ok(app)
+        .layer(middleware::from_fn(auth::auth_middleware)))
 }
 
 async fn chat_completions(
     Extension(user): Extension<User>,
     Json(request): Json<ChatCompletionRequest>,
 ) -> Result<Response, (StatusCode, String)> {
+    // Log the incoming request for debugging
+    tracing::debug!(
+        user_id = user.id,
+        model = request.model,
+        stream = ?request.stream,
+        messages_count = request.messages.len(),
+        "Received chat completion request"
+    );
+
+    // Log request details if in debug mode
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        for (i, msg) in request.messages.iter().enumerate() {
+            tracing::debug!(
+                user_id = user.id,
+                message_index = i,
+                role = msg.role,
+                content_length = msg.content.len(),
+                "Message content"
+            );
+        }
+    }
+
     // Create a database pool
     let pool = db::init("sqlite://./llamp.db").await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to connect to database: {}", e)))?;
@@ -82,6 +89,13 @@ async fn chat_completions(
     // Prepare the request to the backend
     let backend_request = provider.prepare_request(&request, &backend).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to prepare request: {}", e)))?;
+
+    tracing::debug!(
+        user_id = user.id,
+        model = request.model,
+        backend_model = backend.model_name,
+        "Request forwarded to backend"
+    );
 
     // Forward the request to the backend
     let client = reqwest::Client::new();
@@ -129,6 +143,17 @@ async fn chat_completions(
         .header("Content-Type", "application/json")
         .body(Body::from(response_body))
         .unwrap();
+
+    // Log successful response
+    tracing::info!(
+        user_id = user.id,
+        model = request.model,
+        status = 200,
+        duration_ms = elapsed.as_millis(),
+        prompt_tokens = prompt_tokens,
+        completion_tokens = completion_tokens,
+        "Chat completion response sent"
+    );
 
     Ok(response)
 }

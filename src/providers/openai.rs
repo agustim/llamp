@@ -29,6 +29,13 @@ impl LLMProvider for OpenAIProvider {
     ) -> Result<reqwest::Request> {
         let client = Client::new();
 
+        // Log the backend information
+        tracing::debug!(
+            backend_model_name = backend.model_name,
+            backend_endpoint = backend.endpoint_url,
+            "Forwarding request to backend"
+        );
+
         // Create the request body for the provider
         let mut body = serde_json::json!({
             "model": backend.model_name,
@@ -42,6 +49,17 @@ impl LLMProvider for OpenAIProvider {
         }
         if let Some(max_tokens) = req.max_tokens {
             body["max_tokens"] = serde_json::json!(max_tokens);
+        }
+
+        // Log the body being sent (truncate if too large)
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            let body_str = serde_json::to_string(&body).unwrap_or_default();
+            let preview = if body_str.len() > 500 {
+                format!("{}... ({} chars)", &body_str[..500], body_str.len())
+            } else {
+                body_str
+            };
+            tracing::debug!(body = preview, "Request body to backend");
         }
 
         // Determine the correct path based on the request type
