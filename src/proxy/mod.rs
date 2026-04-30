@@ -106,13 +106,39 @@ async fn chat_completions(
 
     let elapsed = start_time.elapsed();
 
+    // Get the status code before consuming the response
+    let status = backend_response.status().as_u16();
+
     // Get the response body
     let response_body = backend_response.text().await
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Failed to read backend response: {}", e)))?;
 
+    // Log the backend response for debugging
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        let response_preview = if response_body.len() > 500 {
+            format!("{}... ({} chars)", &response_body[..500], response_body.len())
+        } else {
+            response_body.clone()
+        };
+        tracing::debug!(
+            user_id = user.id,
+            backend_status = status,
+            response_preview = response_preview,
+            "Backend response received"
+        );
+    }
+
     // Parse the response
     let response_json: serde_json::Value = serde_json::from_str(&response_body)
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Failed to parse backend response: {}", e)))?;
+        .map_err(|e| {
+            tracing::error!(
+                user_id = user.id,
+                response_body_preview = %response_body.chars().take(200).collect::<String>(),
+                error = %e,
+                "Failed to parse backend response"
+            );
+            (StatusCode::BAD_GATEWAY, format!("Failed to parse backend response: {}", e))
+        })?;
 
     // Extract usage if available
     let usage = provider.parse_usage(&response_json);
