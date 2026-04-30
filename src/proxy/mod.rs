@@ -128,16 +128,19 @@ async fn chat_completions(
         );
     }
 
-    // Parse the response
-    let response_json: serde_json::Value = serde_json::from_str(&response_body)
+    // Process the backend response (handles both streaming and non-streaming)
+    let processed_response = process_backend_response(&response_body, &provider)?;
+
+    // Parse the processed response
+    let response_json: serde_json::Value = serde_json::from_str(&processed_response)
         .map_err(|e| {
             tracing::error!(
                 user_id = user.id,
-                response_body_preview = %response_body.chars().take(200).collect::<String>(),
+                processed_response_preview = %processed_response.chars().take(200).collect::<String>(),
                 error = %e,
-                "Failed to parse backend response"
+                "Failed to parse processed response"
             );
-            (StatusCode::BAD_GATEWAY, format!("Failed to parse backend response: {}", e))
+            (StatusCode::BAD_GATEWAY, format!("Failed to parse processed response: {}", e))
         })?;
 
     // Extract usage if available
@@ -163,11 +166,11 @@ async fn chat_completions(
     let _log = db::create_usage_log(&pool, usage_log).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create usage log: {}", e)))?;
 
-    // Build the response
+    // Build the response using the processed response body
     let response = Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/json")
-        .body(Body::from(response_body))
+        .body(Body::from(processed_response))
         .unwrap();
 
     // Log successful response
@@ -182,6 +185,92 @@ async fn chat_completions(
     );
 
     Ok(response)
+}
+
+/// Process backend response, handling both streaming and non-streaming
+fn process_backend_response(
+    response_body: &str,
+    provider: &OpenAIProvider,
+) -> Result<String, (StatusCode, String)> {
+    // Check if response is streaming (contains "data: " prefix)
+    if response_body.contains("data: ") {
+        // Parse streaming chunks and build final response
+        let mut final_content = String::new();
+        let mut final_usage: Option<crate::models::Usage> = None;
+        let mut last_model = String::new();
+        let mut last_id = String::new();
+
+        for line in response_body.split("\n\n") {
+            let trimmed = line.trim();
+            if trimmed.starts_with("data: ") {
+                let json_str = trimmed.trim_start_matches("data: ");
+                if json_str.is_empty() || json_str == "[DONE]" {
+                    continue;
+                }
+
+                match serde_json::from_str::<serde_json::Value>(json_str) {
+                    Ok(value) => {
+                        match provider.parse_streaming_chunk(line.as_bytes()) {
+                            Ok(Some(chunk)) => {
+                                // Process chunk
+                                if let Some(choice) = chunk.choices.first() {
+                                    if let Some(delta) = &choice.delta {
+                                        if let Some(content) = &delta.content {
+                                            final_content.push_str(content);
+                                        }
+                                    }
+                                    if let Some(reason) = &choice.finish_reason {
+                                        tracing::debug!(finish_reason = reason, "Streaming finished");
+                                    }
+                                }
+                                // Extract usage from chunk if available
+                                if let Some(usage) = provider.parse_usage(&value) {
+                                    final_usage = Some(usage);
+                                }
+                                last_model = value.get("model").and_then(|m| m.as_str()).unwrap_or("").to_string();
+                                last_id = value.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+                            }
+                            Ok(None) => {
+                                // Skip chunk without data
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, "Failed to parse streaming chunk");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Failed to parse streaming chunk");
+                    }
+                }
+            }
+        }
+
+        // Build the final response
+        let response = serde_json::json!({
+            "id": last_id,
+            "object": "chat.completion",
+            "created": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            "model": last_model,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": final_content
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": final_usage
+        });
+
+        Ok(serde_json::to_string(&response)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to serialize response: {}", e)))?)
+    } else {
+        // Non-streaming response - return as-is
+        Ok(response_body.to_string())
+    }
 }
 
 async fn list_models() -> Result<Json<serde_json::Value>, (StatusCode, String)> {

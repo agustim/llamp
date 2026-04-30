@@ -1,5 +1,5 @@
 use crate::models::{ChatCompletionRequest, Usage};
-use crate::providers::{LLMProvider, Result, ProviderError};
+use crate::providers::{LLMProvider, Result, ProviderError, OpenAIStreamChunk};
 use reqwest::{Client, Method};
 use serde_json::Value;
 use reqwest::header::HeaderValue;
@@ -87,12 +87,26 @@ impl LLMProvider for OpenAIProvider {
     }
 
     /// Parse a streaming chunk from the provider and return it in OpenAI format
-    fn parse_streaming_chunk(
-        &self,
-        _raw: &[u8],
-    ) -> Result<Option<crate::providers::OpenAIStreamChunk>> {
-        // This is placeholder implementation
-        todo!("Implement streaming chunk parsing")
+    fn parse_streaming_chunk(&self, raw: &[u8]) -> Result<Option<OpenAIStreamChunk>> {
+        // SSE format: "data: {...}\n\n"
+        let line = std::str::from_utf8(raw)
+            .map_err(|e| ProviderError::Other(anyhow::anyhow!("Invalid UTF-8: {}", e)))?;
+
+        if !line.starts_with("data: ") {
+            return Ok(None);
+        }
+
+        let json_str = line.trim_start_matches("data: ").trim();
+        
+        // Skip empty lines and "[DONE]" marker
+        if json_str.is_empty() || json_str == "[DONE]" {
+            return Ok(None);
+        }
+
+        let chunk: OpenAIStreamChunk = serde_json::from_str(json_str)
+            .map_err(|e| ProviderError::JsonError(e))?;
+
+        Ok(Some(chunk))
     }
 
     /// Extract usage from a non-streaming response
