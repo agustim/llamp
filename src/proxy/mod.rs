@@ -298,7 +298,11 @@ fn process_backend_response(
                 },
                 "finish_reason": "stop"
             }],
-            "usage": final_usage
+            "usage": final_usage.unwrap_or_else(|| crate::models::Usage {
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0
+            })
         });
 
         // Log the final response for debugging
