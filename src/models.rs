@@ -163,24 +163,27 @@ fn deserialize_content<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum Content {
-        String(String),
-        Array(Vec<ContentPart>),
-    }
-
-    let content = Content::deserialize(deserializer)?;
-
-    match content {
-        Content::String(s) => Ok(s),
-        Content::Array(parts) => {
-            // Join all text parts with newlines
-            let text: Vec<&str> = parts
-                .iter()
-                .filter_map(|p| p.text.as_deref())
-                .collect();
-            Ok(text.join("\n"))
+    // Use serde_json::Value to capture any JSON value
+    let value = serde_json::Value::deserialize(deserializer)?;
+    
+    match value {
+        serde_json::Value::String(s) => Ok(s),
+        serde_json::Value::Array(arr) => {
+            let mut texts = Vec::new();
+            for item in arr {
+                if let serde_json::Value::Object(obj) = item {
+                    if let Some(text_val) = obj.get("text") {
+                        if let serde_json::Value::String(text) = text_val {
+                            texts.push(text.clone());
+                        }
+                    }
+                }
+            }
+            Ok(texts.join("\n"))
+        }
+        _ => {
+            // For any other type, serialize it back to a JSON string
+            Ok(value.to_string())
         }
     }
 }
