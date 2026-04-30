@@ -124,10 +124,32 @@ pub struct ChatCompletionRequest {
 use serde::de::Deserializer;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentType {
+    Text,
+    ImageUrl,
+    Image,
+    Audio,
+    Video,
+    File,
+    ToolCall,
+    ToolResult,
+    Refusal,
+    RedactedToolCall,
+    RedactedToolResult,
+    Internal,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContentPart {
     #[serde(rename = "type")]
-    pub part_type: String,
+    pub part_type: ContentType,
+    #[serde(default)]
     pub text: Option<String>,
+    #[serde(flatten)]
+    pub other: std::collections::HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
