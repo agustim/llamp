@@ -243,8 +243,14 @@ fn process_backend_response(
                                 if let Some(choice) = chunk.choices.first() {
                                     if let Some(delta) = &choice.delta {
                                         if let Some(content) = &delta.content {
-                                            tracing::debug!(content = content, "Adding content from chunk");
-                                            final_content.push_str(content);
+                                            // Only add content if it's not empty
+                                            // Empty content usually indicates the last chunk with just finish_reason
+                                            if !content.is_empty() {
+                                                tracing::debug!(content = content, "Adding content from chunk");
+                                                final_content.push_str(content);
+                                            } else {
+                                                tracing::debug!("Skipping empty content chunk (likely finish_reason only)");
+                                            }
                                         }
                                     }
                                     if let Some(reason) = &choice.finish_reason {
