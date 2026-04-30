@@ -265,6 +265,17 @@ fn process_backend_response(
             "usage": final_usage
         });
 
+        // Log the final response for debugging
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            let response_str = serde_json::to_string(&response).unwrap_or_default();
+            let preview = if response_str.len() > 500 {
+                format!("{}... ({} chars)", &response_str[..500], response_str.len())
+            } else {
+                response_str
+            };
+            tracing::debug!(final_response = preview, "Built final response");
+        }
+
         Ok(serde_json::to_string(&response)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to serialize response: {}", e)))?)
     } else {
