@@ -190,6 +190,20 @@ async fn chat_completions(
     let _log = db::create_usage_log(&pool, usage_log).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create usage log: {}", e)))?;
 
+    // Log the response body for debugging before building response
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        let response_preview = if processed_response.len() > 500 {
+            format!("{}... ({} chars)", &processed_response[..500], processed_response.len())
+        } else {
+            processed_response.clone()
+        };
+        tracing::debug!(
+            user_id = user.id,
+            response_preview = response_preview,
+            "Final response built"
+        );
+    }
+
     // Build the response using the processed response body
     let response = Response::builder()
         .status(StatusCode::OK)
