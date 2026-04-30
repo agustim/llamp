@@ -250,6 +250,8 @@ fn process_backend_response(
                                     if let Some(reason) = &choice.finish_reason {
                                         tracing::debug!(finish_reason = reason, "Streaming finished");
                                     }
+                                } else {
+                                    tracing::debug!("Chunk has no choices or delta");
                                 }
                                 // Extract usage from chunk if available
                                 if let Some(usage) = provider.parse_usage(&value) {
