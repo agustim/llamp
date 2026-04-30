@@ -1,4 +1,4 @@
-use axum::{body::Body, extract::Extension, http::Request, middleware::Next, response::Response};
+use axum::{body::Body, extract::Request, middleware::Next, response::Response};
 use chrono::Utc;
 use serde_json::json;
 use std::time::Instant;
@@ -8,23 +8,49 @@ use crate::models::User;
 
 /// Logging middleware that captures all HTTP requests and responses
 pub async fn logging_middleware(
-    request: Request<Body>,
+   mut request: Request<Body>,
     next: Next,
 ) -> Response {
     let start_time = Instant::now();
     let method = request.method().clone();
     let uri = request.uri().clone();
-    
+    let path = uri.path().to_string();
+    let query = uri.query().map(|q| q.to_string());
+
     // Extract user if authenticated
     let user_id = request.extensions().get::<User>()
         .map(|u| u.id)
         .unwrap_or(0);
 
-    // Log request start
-    tracing::info!(
+    // Get headers (except sensitive ones)
+    let headers: Vec<(String, String)> = request.headers()
+        .iter()
+        .filter_map(|(name, value)| {
+            let name_str = name.to_string();
+            // Skip sensitive headers
+            if name_str == "authorization" || name_str == "cookie" {
+                return None;
+            }
+            value.to_str().ok().map(|v| (name_str, v.to_string()))
+        })
+        .collect();
+
+    // Read and restore body for logging
+    let (mut parts, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, 65536).await.ok().unwrap_or_default();
+    let body_str = String::from_utf8(bytes.to_vec()).ok().unwrap_or_default();
+    // Restore the body
+    let body = Body::from(bytes);
+    request = Request::from_parts(parts, body);
+
+    // Log request start with full details
+    tracing::debug!(
         method = %method,
-        uri = %uri,
+        path = %path,
+        query = %query.unwrap_or_default(),
         user_id = user_id,
+        headers = ?headers,
+        body = %body_str,
         "Request started"
     );
 
@@ -37,7 +63,7 @@ pub async fn logging_middleware(
     // Log response
     tracing::info!(
         method = %method,
-        uri = %uri,
+        path = %path,
         user_id = user_id,
         status = %status.as_u16(),
         duration_ms = elapsed.as_millis(),

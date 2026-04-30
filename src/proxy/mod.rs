@@ -22,7 +22,14 @@ use crate::auth;
 use crate::providers::openai::OpenAIProvider;
 use crate::providers::LLMProvider;
 
-pub async fn create_app() -> anyhow::Result<Router> {
+// Import the logging module
+mod logging;
+use crate::proxy::logging::logging_middleware;
+
+pub async fn create_app(log_level: String) -> anyhow::Result<Router> {
+    // Determine if we should enable verbose logging
+    let is_debug = log_level.to_lowercase() == "debug";
+
     let app = Router::new()
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/models", get(list_models))
@@ -44,7 +51,14 @@ pub async fn create_app() -> anyhow::Result<Router> {
         .route("/admin/stats/by-user", get(stats_by_user))
         .route("/admin/stats/by-model", get(stats_by_model))
         .route("/admin/logs", get(get_logs))
-        .route_layer(middleware::from_fn(auth::auth_middleware));
+        // Apply logging middleware to all routes
+        .route_layer(middleware::from_fn(logging_middleware))
+        // Apply auth middleware to protected routes
+        .layer(middleware::from_fn(auth::auth_middleware));
+
+    if is_debug {
+        tracing::debug!("Verbose logging enabled for all requests");
+    }
 
     Ok(app)
 }

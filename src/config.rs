@@ -23,6 +23,10 @@ pub struct Cli {
     /// Database URL
     #[arg(long)]
     pub database: Option<String>,
+
+    /// Log level (trace, debug, info, warn, error)
+    #[arg(long, default_value = "info")]
+    pub log_level: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -42,7 +46,7 @@ impl Config {
             .database
             .clone()
             .unwrap_or_else(|| "sqlite://./llamp.db".to_string());
-        let log_level = "info".to_string();
+        let log_level = cli.log_level.clone();
         let admin_key = cli.admin_key.clone();
 
         Ok(Config {

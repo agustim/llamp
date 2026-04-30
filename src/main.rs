@@ -180,8 +180,23 @@ enum StatsCommands {
 async fn main() -> anyhow::Result<()> {
     let cli = LlampCli::parse();
 
-    // Initialize tracing for logging
-    tracing_subscriber::fmt::init();
+    // Get log level from environment variable or use CLI/config default
+    let env_log_level = std::env::var("LLAMP_LOG_LEVEL").ok();
+    let log_level = env_log_level.unwrap_or_else(|| "info".to_string());
+
+    // Initialize tracing with the log level
+    let max_level = match log_level.to_lowercase().as_str() {
+        "trace" => tracing::Level::TRACE,
+        "debug" => tracing::Level::DEBUG,
+        "info" => tracing::Level::INFO,
+        "warn" => tracing::Level::WARN,
+        "error" => tracing::Level::ERROR,
+        _ => tracing::Level::INFO,
+    };
+
+    tracing_subscriber::fmt()
+        .with_max_level(max_level)
+        .init();
 
     match cli {
         LlampCli::Serve {
@@ -190,8 +205,20 @@ async fn main() -> anyhow::Result<()> {
             database_url,
             admin_key,
         } => {
-            // Run the server if no subcommand or run as server
-            run_server(port, host, database_url, admin_key).await
+            // Load configuration to get all settings
+            let config_cli = config::Cli {
+                admin_key: admin_key.clone(),
+                port,
+                host: host.clone(),
+                config: None,
+                database: Some(database_url.clone()),
+                log_level: "info".to_string(), // Default, can be overridden by config file
+            };
+            let config = config::Config::from_args(&config_cli)?;
+
+            // Use log_level from env var (already used for tracing init)
+            // but also pass to app for middleware configuration
+            run_server(port, host, database_url, admin_key, log_level).await
         }
         LlampCli::Backend { action } => match action {
             BackendCommands::List => list_backends().await,
@@ -246,41 +273,22 @@ async fn run_server(
     host: String,
     database_url: String,
     admin_key: Option<String>,
+    log_level: String,
 ) -> anyhow::Result<()> {
-    // Create CLI struct with provided values
-    let cli = config::Cli {
-        admin_key,
-        port,
-        host: host.clone(),
-        config: None,
-        database: Some(database_url),
-    };
-
-    // Load configuration
-    let config = config::Config::from_args(&cli)?;
-
-    tracing::info!("Starting Llamp server with config: {:?}", config);
+    tracing::info!("Starting Llamp server with log_level: {}", log_level);
 
     // Show architecture info
     tracing::info!("System architecture: {}", CloudflareTunnel::detect_arch());
 
-    // Initialize database connection using the config
-    let _pool = db::init(&config.database_url).await?;
+    // Initialize database connection
+    let _pool = db::init(&database_url).await?;
 
-    // Create the application with database connection
-    let app = proxy::create_app().await?;
+    // Create the application with database connection and log level
+    let app = proxy::create_app(log_level).await?;
 
     // Run the server
-    let addr = std::net::SocketAddr::new(host.parse().unwrap(), config.port);
-    tracing::info!("Llamp server listening on {}", config.get_address());
-
-    // Use the admin key if provided
-    if let Some(_admin_key) = config.get_admin_key() {
-        tracing::info!("Admin key is set for this server");
-    }
-
-    // Use the log level
-    tracing::info!("Log level is set to: {}", config.get_log_level());
+    let addr = std::net::SocketAddr::new(host.parse().unwrap(), port);
+    tracing::info!("Llamp server listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
@@ -683,6 +691,7 @@ async fn start_tunnel(hostname: Option<String>) -> anyhow::Result<()> {
         host: "localhost".to_string(),
         config: None,
         database: Some("sqlite://./llamp.db".to_string()),
+        log_level: "info".to_string(),
     };
     let config = config::Config::from_args(&cli)?;
     let server_url = format!("http://{}", config.get_address());
