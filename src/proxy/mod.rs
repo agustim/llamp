@@ -316,7 +316,9 @@ fn process_backend_response(
                 prompt_tokens: 0,
                 completion_tokens: 0,
                 total_tokens: 0
-            })
+            }),
+            "service_tier": serde_json::Value::Null,
+            "system_fingerprint": serde_json::Value::Null
         });
 
         // Log the final response for debugging
