@@ -207,7 +207,7 @@ pub struct Choice {
     pub finish_reason: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Usage {
     pub prompt_tokens: i64,
     pub completion_tokens: i64,
