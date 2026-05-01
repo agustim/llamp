@@ -7,19 +7,8 @@ pub async fn auth_middleware(
     request: Request<axum::body::Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    // Log authentication attempt for debugging
-    let _auth_header = request.headers().get("Authorization");
-
-    if tracing::enabled!(tracing::Level::DEBUG) {
-        if _auth_header.is_some() {
-            tracing::debug!("Authorization header present, attempting authentication");
-        } else {
-            tracing::debug!("No Authorization header found, returning 401");
-        }
-    }
-
     // If the header is missing or invalid, return an error
-    let auth_header = match auth_header.and_then(|h| h.to_str().ok()) {
+    let auth_header = match request.headers().get("Authorization").and_then(|h| h.to_str().ok()) {
         Some(h) => h,
         None => return Err(StatusCode::UNAUTHORIZED),
     };

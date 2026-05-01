@@ -36,6 +36,7 @@ pub struct Config {
     pub host: String,
     pub port: u16,
     pub admin_key: Option<String>,
+    #[allow(dead_code)]
     pub database_url: String,
     pub log_level: String,
 }
