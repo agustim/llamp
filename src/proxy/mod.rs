@@ -153,11 +153,22 @@ async fn chat_completions(
     }
 
     // Process the backend response (handles both streaming and non-streaming)
-    let processed_response = process_backend_response(&response_body, &provider)?;
+    let processed_response = if request.stream.unwrap_or(false) {
+        // For streaming, return the raw response body without processing chunks
+        // This allows the backend to send SSE chunks directly
+        tracing::debug!("Streaming request - returning raw response body");
+        response_body
+    } else {
+        // For non-streaming, process chunks and build final response
+        process_backend_response(&response_body, &provider)?
+    };
 
-    // Parse the processed response
-    let response_json: serde_json::Value = serde_json::from_str(&processed_response)
-        .map_err(|e| {
+    // Parse the processed response (only if not streaming)
+    let response_json: serde_json::Value = if request.stream.unwrap_or(false) {
+        // For streaming, we don't need to parse the response
+        serde_json::json!({})
+    } else {
+        serde_json::from_str(&processed_response).map_err(|e| {
             tracing::error!(
                 user_id = user.id,
                 processed_response_preview = %processed_response.chars().take(200).collect::<String>(),
@@ -165,30 +176,37 @@ async fn chat_completions(
                 "Failed to parse processed response"
             );
             (StatusCode::BAD_GATEWAY, format!("Failed to parse processed response: {}", e))
-        })?;
+        })?
+    };
 
-    // Extract usage if available
-    let usage = provider.parse_usage(&response_json);
+    // Extract usage if available (only if not streaming)
+    let usage = if request.stream.unwrap_or(false) {
+        None
+    } else {
+        provider.parse_usage(&response_json)
+    };
     let prompt_tokens = usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0);
     let completion_tokens = usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0);
     let total_tokens = usage.as_ref().map(|u| u.total_tokens).unwrap_or(0);
 
-    // Create a usage log entry
-    let usage_log = NewUsageLog {
-        user_id: Some(user.id),
-        model_alias: Some(request.model.clone()),
-        prompt_tokens,
-        completion_tokens,
-        total_tokens,
-        latency_ms: Some(elapsed.as_millis() as i64),
-        cost: None,
-        status: "success".to_string(),
-        error_message: None,
-    };
+    // Create a usage log entry (only if not streaming)
+    if !request.stream.unwrap_or(false) {
+        let usage_log = NewUsageLog {
+            user_id: Some(user.id),
+            model_alias: Some(request.model.clone()),
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
+            latency_ms: Some(elapsed.as_millis() as i64),
+            cost: None,
+            status: "success".to_string(),
+            error_message: None,
+        };
 
-    // Create the usage log in the database
-    let _log = db::create_usage_log(&pool, usage_log).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create usage log: {}", e)))?;
+        // Create the usage log in the database
+        let _log = db::create_usage_log(&pool, usage_log).await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create usage log: {}", e)))?;
+    }
 
     // Log the response body for debugging before building response
     if tracing::enabled!(tracing::Level::DEBUG) {
@@ -205,24 +223,50 @@ async fn chat_completions(
     }
 
     // Build the response using the processed response body
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .body(Body::from(processed_response))
-        .unwrap();
+    // Check if request asked for streaming
+    if request.stream.unwrap_or(false) {
+        // For streaming, return the raw response body as SSE chunks
+        // This assumes the backend returns proper SSE format with "data: " prefix
+        let response = Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "text/event-stream")
+            .header("Cache-Control", "no-cache")
+            .header("Connection", "keep-alive")
+            .body(Body::from(processed_response))
+            .unwrap();
 
-    // Log successful response
-    tracing::info!(
-        user_id = user.id,
-        model = request.model,
-        status = 200,
-        duration_ms = elapsed.as_millis(),
-        prompt_tokens = prompt_tokens,
-        completion_tokens = completion_tokens,
-        "Chat completion response sent"
-    );
+        // Log successful streaming response
+        tracing::info!(
+            user_id = user.id,
+            model = request.model,
+            status = 200,
+            duration_ms = elapsed.as_millis(),
+            stream = true,
+            "Chat completion streaming response sent"
+        );
 
-    Ok(response)
+        Ok(response)
+    } else {
+        // For non-streaming, return the processed response
+        let response = Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(Body::from(processed_response))
+            .unwrap();
+
+        // Log successful response
+        tracing::info!(
+            user_id = user.id,
+            model = request.model,
+            status = 200,
+            duration_ms = elapsed.as_millis(),
+            prompt_tokens = prompt_tokens,
+            completion_tokens = completion_tokens,
+            "Chat completion response sent"
+        );
+
+        Ok(response)
+    }
 }
 
 /// Process backend response, handling both streaming and non-streaming
@@ -237,6 +281,7 @@ fn process_backend_response(
         let mut final_usage: Option<crate::models::Usage> = None;
         let mut last_model = String::new();
         let mut last_id = String::new();
+        let mut last_system_fingerprint: Option<String> = None;
 
         for line in response_body.split("\n\n") {
             let trimmed = line.trim();
@@ -275,10 +320,15 @@ fn process_backend_response(
                                 }
                                 // Extract usage from chunk if available
                                 if let Some(usage) = provider.parse_usage(&value) {
-                                    final_usage = Some(usage);
+                                    final_usage = Some(usage.clone());
+                                    tracing::debug!(?usage, "Extracted usage from chunk");
+                                } else {
+                                    tracing::debug!("No usage in chunk");
                                 }
                                 last_model = value.get("model").and_then(|m| m.as_str()).unwrap_or("").to_string();
                                 last_id = value.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+                                last_system_fingerprint = value.get("system_fingerprint").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                tracing::debug!(last_id, last_model, "Updated last_id and last_model from chunk");
                             }
                             Ok(None) => {
                                 tracing::debug!("Skipping chunk without data");
@@ -296,7 +346,7 @@ fn process_backend_response(
         }
 
         // Build the final response
-        let response = serde_json::json!({
+        let mut response_obj = serde_json::json!({
             "id": last_id,
             "object": "chat.completion",
             "created": std::time::SystemTime::now()
@@ -316,14 +366,17 @@ fn process_backend_response(
                 prompt_tokens: 0,
                 completion_tokens: 0,
                 total_tokens: 0
-            }),
-            "service_tier": serde_json::Value::Null,
-            "system_fingerprint": serde_json::Value::Null
+            })
         });
+
+        // Add system_fingerprint if available
+        if let Some(fp) = last_system_fingerprint {
+            response_obj["system_fingerprint"] = serde_json::json!(fp);
+        }
 
         // Log the final response for debugging
         if tracing::enabled!(tracing::Level::DEBUG) {
-            let response_str = serde_json::to_string(&response).unwrap_or_default();
+            let response_str = serde_json::to_string(&response_obj).unwrap_or_default();
             let preview = if response_str.len() > 500 {
                 format!("{}... ({} chars)", &response_str[..500], response_str.len())
             } else {
@@ -332,7 +385,7 @@ fn process_backend_response(
             tracing::debug!(final_response = preview, "Built final response");
         }
 
-        Ok(serde_json::to_string(&response)
+        Ok(serde_json::to_string(&response_obj)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to serialize response: {}", e)))?)
     } else {
         // Non-streaming response - return as-is
