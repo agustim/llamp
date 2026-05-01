@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 pub struct CloudflareTunnel {
     pub hostname: Option<String>,
     pub url: String,
+    pub token: Option<String>,
     process: Option<std::process::Child>,
 }
 
@@ -13,12 +14,18 @@ impl CloudflareTunnel {
         CloudflareTunnel {
             hostname: None,
             url: url.to_string(),
+            token: None,
             process: None,
         }
     }
 
     pub fn with_hostname(mut self, hostname: &str) -> Self {
         self.hostname = Some(hostname.to_string());
+        self
+    }
+
+    pub fn with_token(mut self, token: &str) -> Self {
+        self.token = Some(token.to_string());
         self
     }
 
@@ -78,9 +85,16 @@ impl CloudflareTunnel {
             cmd.arg("--hostname").arg(hostname);
         }
 
+        if let Some(token) = &self.token {
+            cmd.arg("--token").arg(token);
+        }
+
         tracing::info!("Starting Cloudflare tunnel with URL: {}", self.url);
         if let Some(ref hostname) = self.hostname {
             tracing::info!("Hostname: {}", hostname);
+        }
+        if let Some(ref token) = self.token {
+            tracing::info!("Token: {}...", &token[..8]);
         }
         tracing::info!("System architecture: {}", Self::detect_arch());
 

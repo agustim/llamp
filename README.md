@@ -125,12 +125,27 @@ Llamp is designed to work on multiple architectures:
 
 Llamp includes built-in support for Cloudflare Tunnels to expose your local server:
 
-```bash
-# Install cloudflared (required)
-# See: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
+#### Mode 1: Temporary Tunnel (no registration required)
 
-# Start a tunnel
-llamp tunnel start --hostname yourdomain.example.com
+Use `--url` to create a temporary tunnel with a random Cloudflare domain:
+
+```bash
+# Start a temporary tunnel
+llamp tunnel start --url http://localhost:8080
+
+# Or use default server address (port 8080)
+llamp tunnel start --url http://localhost:8080
+```
+
+This creates a temporary HTTPS URL like `https://random-subdomain.cloudflare.com` that you can use immediately without registration.
+
+#### Mode 2: Pre-configured Tunnel (with custom domain)
+
+Use `--hostname` and `--token` to connect to your own Cloudflare domain:
+
+```bash
+# Start a tunnel with your custom domain
+llamp tunnel start --hostname yourdomain.example.com --token YOUR_CLOUDFLARE_TOKEN
 
 # Check tunnel status
 llamp tunnel status
@@ -138,6 +153,8 @@ llamp tunnel status
 # Stop the tunnel
 llamp tunnel stop
 ```
+
+This uses your pre-registered Cloudflare domain and tunnel configuration.
 
 The tunnel automatically:
 - Detects your system architecture
@@ -150,34 +167,33 @@ If Qwen Code doesn't work through the Llamp tunnel, use the debug proxy to analy
 
 1. **Install dependencies:**
 ```bash
-pip install aiohttp
+pip install aiohttp python-dotenv
 ```
 
-2. **Set environment variables:**
-
-   **Option 1: Using environment variables**
-   ```bash
-   export LITELLM_URL="http://localhost:4000"  # Your LiteLLM instance
-   export LAMP_URL="http://localhost:8080"      # Your Llamp instance
-   export LITELLM_API_KEY="your-key"            # Optional: API key for LiteLLM
-   export LAMP_API_KEY="your-key"               # Optional: API key for Llamp
-   export PROXY_PORT="9000"                     # Proxy port
-   ```
-
-   **Option 2: Using .env file**
-   Create a `.env` file in the `proxy-analyze/` directory (see `proxy-analyze/.env.example` for template)
-
-3. **Run the debug proxy:**
+2. **Configure environment variables:**
 ```bash
-python proxy-analyze/debug_proxy.py
+export LITELLM_URL="http://localhost:4000"  # Your LiteLLM instance
+export LAMP_URL="http://localhost:8080"      # Your Llamp instance
+export LITELLM_API_KEY="your-key"            # Optional: API key for LiteLLM
+export LAMP_API_KEY="your-key"               # Optional: API key for Llamp
+export LITELLM_MODEL="your-model"            # Optional: Model name for LiteLLM
+export LAMP_MODEL="your-model-alias"         # Optional: Model alias for Llamp
 ```
 
-4. **Configure Qwen Code** to use `http://localhost:9000/v1` and make a test request
+3. **Quick automated analysis:**
+```bash
+cd proxy-analyze
+python analyze_diff.py
+```
+This will automatically compare LiteLLM vs Llamp and generate a report with severity ratings. Exit code 0 means compatible, 1 means issues found.
 
-5. **Analyze the logs** in `tmp/debug_proxy/` to compare:
-   - `litellm_request_*.json` vs `llamp_request_*.json`
-   - `litellm_response_*.json` vs `llamp_response_*.json`
+4. **Manual debug proxy (detailed logging):**
+```bash
+cd proxy-analyze
+python debug_proxy.py
+```
+Configure Qwen Code to use `http://localhost:9000/v1` and make requests. Analyze the logs in `tmp/debug_proxy/` to compare:
+- `litellm_request_*.json` vs `llamp_request_*.json`
+- `litellm_response_*.json` vs `llamp_response_*.json`
 
-The logs will reveal any differences in headers, request format, or response structure that may be causing compatibility issues.
-
-See `proxy-analyze/README.md` for detailed instructions.
+See the [proxy-analyze README](proxy-analyze/README.md) for more details.

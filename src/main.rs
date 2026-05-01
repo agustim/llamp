@@ -261,7 +261,7 @@ async fn main() -> anyhow::Result<()> {
         },
         LlampCli::Demo => demonstrate_db_usage().await,
         LlampCli::Tunnel { action } => match action {
-            TunnelCommands::Start { url: _, token: _, hostname } => start_tunnel(hostname).await,
+            TunnelCommands::Start { url, token, hostname } => start_tunnel(url, token, hostname).await,
             TunnelCommands::Status => tunnel_status().await,
             TunnelCommands::Stop => stop_tunnel().await,
         },
@@ -680,28 +680,36 @@ async fn demonstrate_db_usage() -> anyhow::Result<()> {
 // Cloudflare Tunnel management functions
 // TUNNEL_PROCESS is defined in the lazy_static! block above
 
-async fn start_tunnel(hostname: Option<String>) -> anyhow::Result<()> {
+async fn start_tunnel(url: Option<String>, token: Option<String>, hostname: Option<String>) -> anyhow::Result<()> {
     // Initialize database connection first
     let _pool = db::init("sqlite://./llamp.db").await?;
 
-    // Get the server address from config
-    let cli = config::Cli {
-        admin_key: None,
-        port: 8080,
-        host: "localhost".to_string(),
-        config: None,
-        database: Some("sqlite://./llamp.db".to_string()),
-        log_level: "info".to_string(),
+    // Get the server address from config or use default
+    let server_url = if let Some(url_str) = url {
+        url_str
+    } else {
+        let cli = config::Cli {
+            admin_key: None,
+            port: 8080,
+            host: "localhost".to_string(),
+            config: None,
+            database: Some("sqlite://./llamp.db".to_string()),
+            log_level: "info".to_string(),
+        };
+        let config = config::Config::from_args(&cli)?;
+        format!("http://{}", config.get_address())
     };
-    let config = config::Config::from_args(&cli)?;
-    let server_url = format!("http://{}", config.get_address());
 
     tracing::info!("Starting Cloudflare tunnel...");
 
     let mut tunnel = CloudflareTunnel::new(&server_url);
 
-    if let Some(ref hostname) = hostname {
-        tunnel = tunnel.with_hostname(hostname);
+    if let Some(ref hostname_str) = hostname {
+        tunnel = tunnel.with_hostname(hostname_str);
+    }
+
+    if let Some(token_str) = token {
+        tunnel = tunnel.with_token(&token_str);
     }
 
     tunnel.start()?;

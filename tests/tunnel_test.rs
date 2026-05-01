@@ -19,12 +19,22 @@ mod tests {
     }
 
     #[test]
-    fn test_tunnel_multiple_options() {
+    fn test_tunnel_with_token() {
         let tunnel =
-            CloudflareTunnel::new("http://localhost:3000").with_hostname("api.example.com");
+            CloudflareTunnel::new("http://localhost:8080").with_token("test-token-12345");
+        assert_eq!(tunnel.token, Some("test-token-12345".to_string()));
+        assert_eq!(tunnel.url, "http://localhost:8080");
+    }
+
+    #[test]
+    fn test_tunnel_multiple_options() {
+        let tunnel = CloudflareTunnel::new("http://localhost:3000")
+            .with_hostname("api.example.com")
+            .with_token("test-token-67890");
 
         assert_eq!(tunnel.url, "http://localhost:3000");
         assert_eq!(tunnel.hostname, Some("api.example.com".to_string()));
+        assert_eq!(tunnel.token, Some("test-token-67890".to_string()));
     }
 
     #[test]
