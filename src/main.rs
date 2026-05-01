@@ -214,7 +214,7 @@ async fn main() -> anyhow::Result<()> {
                 database: Some(database_url.clone()),
                 log_level: "info".to_string(), // Default, can be overridden by config file
             };
-            let config = config::Config::from_args(&config_cli)?;
+            let _config = config::Config::from_args(&config_cli)?;
 
             // Use log_level from env var (already used for tracing init)
             // but also pass to app for middleware configuration
@@ -272,7 +272,7 @@ async fn run_server(
     port: u16,
     host: String,
     database_url: String,
-    admin_key: Option<String>,
+    _admin_key: Option<String>,
     log_level: String,
 ) -> anyhow::Result<()> {
     tracing::info!("Starting Llamp server with log_level: {}", log_level);

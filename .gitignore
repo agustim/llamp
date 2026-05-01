@@ -40,3 +40,10 @@ llamp.toml
 
 # Temporary files
 tmp/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+__pycache__

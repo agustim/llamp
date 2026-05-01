@@ -16,12 +16,14 @@ pub struct Cli {
     #[arg(long, default_value = "0.0.0.0")]
     pub host: String,
 
-    /// Path to config file
+    /// Path to config file (reserved for future use)
     #[arg(long)]
+    #[allow(dead_code)]
     pub config: Option<String>,
 
     /// Database URL
     #[arg(long)]
+    #[allow(dead_code)]
     pub database: Option<String>,
 
     /// Log level (trace, debug, info, warn, error)
@@ -63,10 +65,12 @@ impl Config {
         format!("{}:{}", self.host, self.port)
     }
 
+    #[allow(dead_code)]
     pub fn get_log_level(&self) -> &str {
         &self.log_level
     }
 
+    #[allow(dead_code)]
     pub fn get_admin_key(&self) -> Option<&String> {
         self.admin_key.as_ref()
     }

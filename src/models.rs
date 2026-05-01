@@ -124,6 +124,7 @@ pub struct ChatCompletionRequest {
 use serde::de::Deserializer;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 #[serde(rename_all = "snake_case")]
 pub enum ContentType {
     Text,
@@ -143,6 +144,7 @@ pub enum ContentType {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct ContentPart {
     #[serde(rename = "type")]
     pub part_type: ContentType,

@@ -22,7 +22,7 @@ use crate::auth;
 use crate::providers::openai::OpenAIProvider;
 use crate::providers::LLMProvider;
 
-pub async fn create_app(log_level: String) -> anyhow::Result<Router> {
+pub async fn create_app(_log_level: String) -> anyhow::Result<Router> {
     Ok(Router::new()
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/models", get(list_models))

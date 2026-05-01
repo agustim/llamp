@@ -143,3 +143,41 @@ The tunnel automatically:
 - Detects your system architecture
 - Logs version and architecture information
 - Provides secure HTTPS access via Cloudflare's network
+
+## Debugging Qwen Code Compatibility
+
+If Qwen Code doesn't work through the Llamp tunnel, use the debug proxy to analyze the differences:
+
+1. **Install dependencies:**
+```bash
+pip install aiohttp
+```
+
+2. **Set environment variables:**
+
+   **Option 1: Using environment variables**
+   ```bash
+   export LITELLM_URL="http://localhost:4000"  # Your LiteLLM instance
+   export LAMP_URL="http://localhost:8080"      # Your Llamp instance
+   export LITELLM_API_KEY="your-key"            # Optional: API key for LiteLLM
+   export LAMP_API_KEY="your-key"               # Optional: API key for Llamp
+   export PROXY_PORT="9000"                     # Proxy port
+   ```
+
+   **Option 2: Using .env file**
+   Create a `.env` file in the `proxy-analyze/` directory (see `proxy-analyze/.env.example` for template)
+
+3. **Run the debug proxy:**
+```bash
+python proxy-analyze/debug_proxy.py
+```
+
+4. **Configure Qwen Code** to use `http://localhost:9000/v1` and make a test request
+
+5. **Analyze the logs** in `tmp/debug_proxy/` to compare:
+   - `litellm_request_*.json` vs `llamp_request_*.json`
+   - `litellm_response_*.json` vs `llamp_response_*.json`
+
+The logs will reveal any differences in headers, request format, or response structure that may be causing compatibility issues.
+
+See `proxy-analyze/README.md` for detailed instructions.

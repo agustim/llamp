@@ -8,10 +8,10 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Result<Response, StatusCode> {
     // Log authentication attempt for debugging
-    let auth_header = request.headers().get("Authorization");
-    
+    let _auth_header = request.headers().get("Authorization");
+
     if tracing::enabled!(tracing::Level::DEBUG) {
-        if let Some(header) = auth_header {
+        if _auth_header.is_some() {
             tracing::debug!("Authorization header present, attempting authentication");
         } else {
             tracing::debug!("No Authorization header found, returning 401");
